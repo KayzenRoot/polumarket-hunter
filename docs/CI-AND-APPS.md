@@ -101,6 +101,19 @@ primary reviewer and one optional second opinion, or the PR becomes noisy.
 4. Open a pull request and confirm the app's check appears.
 5. If an app adds a required check, add it to the ruleset only after it has run successfully once.
 
+## Selected primary reviewer: ECC Tools
+
+The owner chose **ECC Tools** as the primary AI reviewer (#35). It is free for public repositories.
+Status: **install pending owner click**.
+
+1. Open https://github.com/apps/ecc-tools while logged in as the owner.
+2. Install for **Only select repositories** → `polumarket-hunter`.
+3. Comment `/ecc-tools analyze` on an issue or pull request.
+4. Review the generated PR/check and record the result in #35.
+
+Do not install CodeRabbit or Greptile as a second AI reviewer unless the owner explicitly asks;
+SonarCloud and Socket already provide the second static-analysis and supply-chain signals.
+
 ## Enabling secret scanning and Dependabot alerts
 
 The repository settings are configured through the GitHub API:
