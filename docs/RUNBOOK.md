@@ -125,7 +125,7 @@ Open http://127.0.0.1:8787. Fastify serves the built dashboard from `apps/web/di
 npm run record -- --minutes 10 --markets 8 --min-liquidity 50000
 ```
 
-Output: `data/recordings/polyhunter-YYYY-MM-DD.jsonl` (one normalized book per line). Press
+Output: `data/recordings/polyhunter-<timestamp>.jsonl` (one normalized book per line). Press
 `Ctrl+C` to stop early; the recorder flushes before exit.
 
 Session reports are rebuilt from SQLite; use the **Reports** dashboard view or
@@ -139,7 +139,7 @@ Retention, backup, restore and disk/corruption recovery are in
 ## Backtesting a recording
 
 ```bash
-npm run backtest -- --file data/recordings/polyhunter-YYYY-MM-DD.jsonl
+npm run backtest -- --file data/recordings/polyhunter-<timestamp>.jsonl
 npm run backtest -- --file <file> --strategy momentum-taker --json --out metrics.json
 ```
 

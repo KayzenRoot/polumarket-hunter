@@ -162,8 +162,8 @@ Run:
 
 ```bash
 npm run record -- --minutes 10 --markets 8
-npm run data:validate -- --file data/recordings/polyhunter-YYYY-MM-DD.jsonl
-npm run backtest -- --file data/recordings/polyhunter-YYYY-MM-DD.jsonl
+npm run data:validate -- --file data/recordings/polyhunter-<timestamp>.jsonl
+npm run backtest -- --file data/recordings/polyhunter-<timestamp>.jsonl
 npm run demo
 ```
 
