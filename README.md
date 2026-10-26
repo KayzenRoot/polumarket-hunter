@@ -79,10 +79,11 @@ npm run smoke
 
 ## Production path
 
-v0.1.0 targets a local, single-user, paper-first production release. The scope is defined in the
+v0.1.0 is the first local, single-user, paper-first production release. The supported Windows path
+is the source install; the published artifact is Linux x64. The scope is defined in the
 [production contract](docs/PRODUCTION-CONTRACT.md); the execution order, gates and PR protocol are
-in the [production plan](docs/PRODUCTION-PLAN.md). The backlog lives in the
-[v0.1.0 milestone](https://github.com/KayzenRoot/polumarket-hunter/milestone/1).
+in the [production plan](docs/PRODUCTION-PLAN.md). The release is on the
+[v0.1.0 page](https://github.com/KayzenRoot/polumarket-hunter/releases/tag/v0.1.0).
 
 Live execution is not part of v0.1.0. The geoblock currently reports `BLOCKED` for BR; there is no
 VPN/proxy bypass and no signing code in the repository.

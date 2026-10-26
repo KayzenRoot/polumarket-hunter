@@ -22,9 +22,12 @@ git tag -s v0.1.0 -m "PolyHunter v0.1.0"
 git push origin v0.1.0
 ```
 
-Use an annotated signed tag when possible. The tag workflow runs automatically; do not create the
-GitHub release by hand. The existing `v0.1.0` bootstrap preview must be replaced only through this
-workflow.
+Use an annotated signed tag when possible. If no signing key is available, use an annotated tag and
+record that it is unsigned in the release evidence. The tag workflow runs automatically; do not
+create the GitHub release by hand.
+
+The `v0.1.0` bootstrap preview was replaced through this workflow on 2026-10-26 (annotated tag on
+`9170a07`; see `docs/evidence/release-v0.1.0-2026-10-26.md`). Future releases use a new tag.
 
 The workflow:
 
@@ -36,7 +39,9 @@ The workflow:
 - writes and verifies `SHA256SUMS`;
 - publishes the release with notes linking the contract, plan, runbook, fees and research memo.
 
-Re-running the workflow for the same tag uploads assets with `--clobber` and updates the notes.
+Re-running the workflow for the same tag uploads assets with `--clobber` and updates the notes. Only
+do this to recover a failed build before consumers download it; do not rebuild a published release
+just to change its metadata.
 
 To validate packaging without publishing, dispatch the workflow in dry-run mode:
 
@@ -51,12 +56,17 @@ artifact; it does not create a release.
 
 ```bash
 sha256sum -c SHA256SUMS
-tar -xzf polyhunter-v0.1.0-linux-x64.tar.gz
+mkdir polyhunter-v0.1.0
+tar -xzf polyhunter-v0.1.0-linux-x64.tar.gz -C polyhunter-v0.1.0
 cd polyhunter-v0.1.0
 cp .env.example .env
 # edit DATABASE_PATH / RECORD_DIR / API_TOKEN as needed
 node apps/server/dist/main.js
 ```
+
+The tarball has no top-level directory, so always extract it into an empty directory. Run the server
+from the extracted root; the API resolves `apps/web/dist` relative to the working directory and
+otherwise serves the API fallback instead of the dashboard.
 
 Open http://127.0.0.1:8787 and check `/api/health`. Run `npm run doctor` from the source checkout
 for the full local diagnostics.
@@ -71,8 +81,15 @@ The tarball contains no `data/`, `.env`, recordings, wallet material or secrets.
 - `apps/server/dist`, `apps/web/dist`
 - `README.md`, `.env.example`, `docs/`
 
-Node 24 is required. The artifact is Linux x64; Windows users should use the source install or the
-Docker runtime.
+Node 24 or 26 (`>=24 <27`) is required. The artifact is Linux x64; Windows users should use the
+source install or the Docker runtime.
+
+## Post-release verification
+
+Record the tag object, release URL, workflow run, asset SHA256 values and the Linux smoke result in
+`docs/evidence/release-<tag>-<date>.md`. Verify `sha256sum -c SHA256SUMS` from the downloaded
+assets, start the server from the extracted root, and check `/api/health` and `/` (the dashboard,
+not the API fallback). See `docs/evidence/release-v0.1.0-2026-10-26.md`.
 
 ## Release notes and limitations
 
@@ -84,7 +101,9 @@ live execution is not implemented and the geoblock remains enforced.
 
 If a release is wrong:
 
-1. Do not delete the tag or rewrite history.
+1. Do not delete the tag or rewrite history. The one-time bootstrap replacement of `v0.1.0` on
+   2026-10-26 is documented in the release evidence; it is not a precedent for moving a published
+   production tag.
 2. Mark the GitHub release as a pre-release/draft and publish a corrective patch tag.
 3. Restore data from a verified backup if the release corrupted local state.
 4. Record the incident in `docs/`.
