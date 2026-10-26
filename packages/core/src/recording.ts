@@ -10,6 +10,7 @@ export interface RecordingLine {
 export interface DecodeResult {
   readonly books: readonly OrderBook[];
   readonly errors: readonly string[];
+  readonly warnings: readonly string[];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -94,20 +95,58 @@ export function decodeRecordingLine(line: string): OrderBook | null {
   }
 }
 
+function levelIssues(value: unknown): string[] {
+  const candidate = isRecord(value) && isRecord(value.book) ? value.book : value;
+  if (!isRecord(candidate)) {
+    return [];
+  }
+  const issues: string[] = [];
+  for (const side of ['bids', 'asks'] as const) {
+    const levels = candidate[side];
+    if (!Array.isArray(levels)) {
+      continue;
+    }
+    levels.forEach((level, index) => {
+      if (!isRecord(level)) {
+        return;
+      }
+      const price = level.price;
+      const size = level.size;
+      if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0 || price >= 1) {
+        issues.push(`${side}[${index}] price ${String(price)} is outside (0, 1)`);
+      } else if (typeof size !== 'number' || !Number.isFinite(size) || size <= 0) {
+        issues.push(`${side}[${index}] size ${String(size)} must be positive`);
+      }
+    });
+  }
+  return issues;
+}
+
 export function decodeRecording(text: string): DecodeResult {
   const books: OrderBook[] = [];
   const errors: string[] = [];
+  const warnings: string[] = [];
   const lines = text.split(/\r?\n/);
   lines.forEach((line, index) => {
     if (line.trim().length === 0) {
       return;
     }
-    const book = decodeRecordingLine(line);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      errors.push(`line ${index + 1}: invalid book recording`);
+      return;
+    }
+    const book = decodeBook(parsed);
     if (book === null) {
       errors.push(`line ${index + 1}: invalid book recording`);
       return;
     }
+    for (const issue of levelIssues(parsed)) {
+      warnings.push(`line ${index + 1}: ${issue}`);
+    }
     books.push(book);
   });
-  return { books, errors };
+  return { books, errors, warnings };
 }

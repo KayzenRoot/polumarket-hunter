@@ -1,14 +1,7 @@
 import { parseArgs } from 'node:util';
 import { GammaClient, MarketSocket, type TokenMetadata } from '@polyhunter/polymarket';
 import { BookRecorder } from '../apps/server/src/recorder.js';
-
-function numberOption(value: string | boolean | undefined, fallback: number): number {
-  if (typeof value !== 'string') {
-    return fallback;
-  }
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
+import { numberOption } from './args.js';
 
 const { values } = parseArgs({
   options: {

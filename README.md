@@ -133,6 +133,7 @@ Risk controls are fail-closed. See [docs/STRATEGY.md](docs/STRATEGY.md) and
 | `npm run test:e2e`                       | Playwright dashboard/control-flow tests         |
 | `npm run smoke`                          | Live public Gamma/CLOB/WS/geoblock smoke test   |
 | `npm run record -- --minutes 5`          | Record public books to `data/recordings`        |
+| `npm run data:validate -- --file <file>` | Validate a recording before backtesting         |
 | `npm run backtest -- --file <recording>` | Replay a recording through the strategy         |
 | `npm run demo`                           | Deterministic synthetic backtest                |
 | `npm run ecc:sync`                       | Refresh curated ECC skills/rules                |
@@ -141,11 +142,15 @@ Risk controls are fail-closed. See [docs/STRATEGY.md](docs/STRATEGY.md) and
 
 ```bash
 npm run record -- --minutes 10 --markets 8 --min-liquidity 50000
+npm run data:validate -- --file data/recordings/polyhunter-YYYY-MM-DD.jsonl
 npm run backtest -- --file data/recordings/polyhunter-YYYY-MM-DD.jsonl --strategy micro-maker
 ```
 
-The recorder writes one normalized book per line. The backtest uses the same `PaperBroker` and
-`RiskController` as the live paper engine, so fill and risk behavior cannot silently diverge.
+The recorder writes one normalized book per line. The validator checks duration, gaps, price bounds,
+crossed books, timestamps, duplicate hashes and token coverage before the backtest will run. See
+[docs/DATA-QUALITY.md](docs/DATA-QUALITY.md) for thresholds and the JSON report. The backtest uses
+the same `PaperBroker` and `RiskController` as the live paper engine, so fill and risk behavior
+cannot silently diverge.
 
 ## Quality and security
 

@@ -10,3 +10,4 @@ export * from './risk.js';
 export * from './strategy.js';
 export * from './synthetic.js';
 export * from './types.js';
+export * from './validation.js';
