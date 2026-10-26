@@ -170,7 +170,9 @@ fees, win rate, profit factor, max drawdown, max exposure, fill rate and the equ
 2. Record a period you did not use for tuning.
 3. Report the full metric set, including drawdown and fill rate, not only total return.
 4. Compare against a no-trade baseline and a simple passive baseline.
-5. If the maker mode shows zero fills, do not “fix” it by assuming fills that the book did not
+5. Run `npm run research` so the 70/30 split, baselines and config hash are recorded together; see
+   [docs/RESEARCH.md](RESEARCH.md).
+6. If the maker mode shows zero fills, do not “fix” it by assuming fills that the book did not
    produce. Change the hypothesis or the market selection, then re-record.
 
 ## Tuning knobs
