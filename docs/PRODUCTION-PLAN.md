@@ -191,16 +191,16 @@ Do not compress the evidence gate to hit a date.
 
 As of 2026-10-26:
 
-- v0.1.0 production: **24 open**, 1 closed (#15).
+- v0.1.0 production: **22 open**, 3 closed (#15, #16, #17).
 - v0.1.x hardening: **6 open**.
 - v0.2.0 live readiness: **6 open, blocked**.
 - Current gate: **G1 — correctness**.
 
 ## 11. Next action
 
-1. Create the #16 branch `feat/issue-16-tick-size` from `main`.
-2. Implement per-market tick size in core strategy, paper execution and tick-size-change handling.
-3. Add tests for 0.001 and 0.01 ticks; run `npm run ci`.
-4. Do not start #17 until #16 is merged, unless the owner explicitly accepts the conflict risk.
+1. Create the #19 branch `feat/issue-19-provider-faults` from `main`.
+2. Add fixture-driven fault-injection tests for Gamma, CLOB, WebSocket and geoblock failures.
+3. Assert fail-closed behavior for stale, crossed, malformed and missing data.
+4. Keep the #17 session contract intact: a provider fault must not leak a session into the next run.
 
 The first production PR should be small and boring. That is the point.
