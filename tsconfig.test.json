@@ -4,6 +4,7 @@
     "composite": false,
     "incremental": false,
     "noEmit": true,
+    "lib": ["ES2023", "DOM"],
     "paths": {
       "@polyhunter/core": ["./packages/core/src/index.ts"],
       "@polyhunter/polymarket": ["./packages/polymarket/src/index.ts"],
