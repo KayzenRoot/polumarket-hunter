@@ -7,9 +7,12 @@ export interface BookRecorderLike {
   close(): Promise<void>;
 }
 
+let sequence = 0;
+
 function fileName(now: number): string {
-  const date = new Date(now).toISOString().slice(0, 10);
-  return `polyhunter-${date}.jsonl`;
+  sequence += 1;
+  const stamp = new Date(now).toISOString().replace(/[:.]/g, '-');
+  return `polyhunter-${stamp}-${sequence.toString(36)}.jsonl`;
 }
 
 export class BookRecorder implements BookRecorderLike {
@@ -18,7 +21,7 @@ export class BookRecorder implements BookRecorderLike {
 
   public constructor(directory: string, now: number = Date.now()) {
     mkdirSync(directory, { recursive: true });
-    this.stream = createWriteStream(join(directory, fileName(now)), { flags: 'a' });
+    this.stream = createWriteStream(join(directory, fileName(now)), { flags: 'wx' });
   }
 
   public write(book: OrderBook): void {

@@ -159,9 +159,9 @@ Release tags are built by `.github/workflows/release.yml` with an SBOM and check
 
 ```bash
 npm run record -- --minutes 10 --markets 8 --min-liquidity 50000
-npm run data:validate -- --file data/recordings/polyhunter-YYYY-MM-DD.jsonl
-npm run research -- --file data/recordings/polyhunter-YYYY-MM-DD.jsonl
-npm run backtest -- --file data/recordings/polyhunter-YYYY-MM-DD.jsonl --strategy micro-maker
+npm run data:validate -- --file data/recordings/polyhunter-<timestamp>.jsonl
+npm run research -- --file data/recordings/polyhunter-<timestamp>.jsonl
+npm run backtest -- --file data/recordings/polyhunter-<timestamp>.jsonl --strategy micro-maker
 ```
 
 The recorder writes one normalized book per line. The validator checks duration, gaps, price bounds,
