@@ -1380,6 +1380,13 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.operator-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .feed-panel {
   padding: 17px 18px 18px;
 }

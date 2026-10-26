@@ -57,11 +57,13 @@ export function Sidebar({ view, onChange, health, equity, demoMode, session }: S
             tone={
               health.status === 'running'
                 ? 'positive'
-                : health.status === 'killed'
+                : health.status === 'paused'
                   ? 'warning'
-                  : health.status === 'error'
-                    ? 'negative'
-                    : 'neutral'
+                  : health.status === 'killed'
+                    ? 'warning'
+                    : health.status === 'error'
+                      ? 'negative'
+                      : 'neutral'
             }
           >
             {health.status}

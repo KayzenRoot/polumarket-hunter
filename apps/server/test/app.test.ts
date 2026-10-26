@@ -162,13 +162,29 @@ describe('http api', () => {
     });
     expect(invalid.statusCode).toBe(400);
 
-    const valid = await app.inject({
+    for (const action of ['pause', 'resume', 'cancel-all', 'flatten', 'kill'] as const) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/control',
+        payload: { action, actor: 'dashboard' },
+      });
+      expect(response.statusCode).toBe(200);
+    }
+    expect(engine.controls).toEqual(['pause', 'resume', 'cancel-all', 'flatten', 'kill']);
+
+    const invalidActor = await app.inject({
       method: 'POST',
       url: '/api/control',
-      payload: { action: 'kill' },
+      payload: { action: 'pause', actor: 'x'.repeat(65) },
     });
-    expect(valid.statusCode).toBe(200);
-    expect(engine.controls).toEqual(['kill']);
+    expect(invalidActor.statusCode).toBe(400);
+  });
+
+  it('serves the recent event log', async () => {
+    const { app } = await build();
+    const response = await app.inject({ method: 'GET', url: '/api/events?limit=5' });
+    expect(response.statusCode).toBe(200);
+    expect((response.json() as { data: { kind: string }[] }).data[0]?.kind).toBe('engine_started');
   });
 
   it('enforces the API token when configured', async () => {

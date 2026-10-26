@@ -3,6 +3,7 @@ import {
   buildSessionReport,
   type ControlRequest,
   createStrategy,
+  type EngineEvent,
   type EngineHealth,
   type EngineStatus,
   FeedHealthTracker,
@@ -63,6 +64,13 @@ export interface EngineAlert {
   readonly at: number;
   readonly mode: 'paper' | 'live';
   readonly sessionId: string | null;
+}
+
+export interface FlattenSummary {
+  readonly canceledOrders: number;
+  readonly filledShares: number;
+  readonly residualShares: number;
+  readonly skippedTokens: number;
 }
 
 export interface EngineDeps {
@@ -201,7 +209,7 @@ export class PolyHunterEngine implements EnginePort {
   }
 
   public async start(): Promise<void> {
-    if (this.status === 'running') {
+    if (this.status === 'running' || this.status === 'paused') {
       return;
     }
     if (this.status === 'starting') {
@@ -342,45 +350,156 @@ export class PolyHunterEngine implements EnginePort {
     this.emitState();
   }
 
-  public async control(action: ControlRequest['action']): Promise<void> {
+  public pause(): number {
+    if (this.status !== 'running') {
+      return 0;
+    }
+    let canceledOrders = 0;
+    for (const order of this.broker.openOrders) {
+      if (order.side === 'BUY') {
+        const canceled = this.broker.cancel(order.id, 'engine paused');
+        if (canceled !== null) {
+          canceledOrders += 1;
+        }
+      }
+    }
+    this.status = 'paused';
+    this.recordEvent('engine_paused', 'info', 'paper engine paused', { canceledOrders });
+    this.updatePortfolio();
+    this.emitState();
+    return canceledOrders;
+  }
+
+  public resume(): void {
+    if (this.status !== 'paused') {
+      return;
+    }
+    this.status = 'running';
+    this.recordEvent('engine_resumed', 'info', 'paper engine resumed', null);
+    this.emitState();
+  }
+
+  public cancelAll(): number {
+    const canceled = this.broker.cancelAll('operator cancel-all');
+    this.updatePortfolio();
+    this.recordEvent('orders_cancelled', 'info', `${canceled.length} resting order(s) cancelled`, {
+      canceledOrders: canceled.length,
+    });
+    this.emitState();
+    return canceled.length;
+  }
+
+  public flatten(): FlattenSummary {
+    const canceled = this.broker.cancelAll('flatten paper inventory');
+    let filledShares = 0;
+    let skippedTokens = 0;
+    for (const position of this.broker.positions()) {
+      const book = this.books.get(position.tokenId);
+      const top = book === undefined ? null : topOfBook(book);
+      if (book === undefined || top === null || position.shares <= 0) {
+        skippedTokens += 1;
+        continue;
+      }
+      const result = this.broker.place(
+        {
+          marketId: position.marketId,
+          tokenId: position.tokenId,
+          outcome: position.outcome,
+          side: 'SELL',
+          type: 'market',
+          limitPrice: null,
+          size: position.shares,
+          reason: 'operator flatten at current bid',
+        },
+        book,
+      );
+      for (const trade of result.fills) {
+        this.persistTrade(trade);
+        filledShares += trade.size;
+      }
+    }
+    const residualShares = this.broker
+      .positions()
+      .reduce((sum, position) => sum + position.shares, 0);
+    const summary: FlattenSummary = {
+      canceledOrders: canceled.length,
+      filledShares: Math.round(filledShares * 100) / 100,
+      residualShares: Math.round(residualShares * 100) / 100,
+      skippedTokens,
+    };
+    this.updatePortfolio();
+    this.recordEvent(
+      'flattened',
+      summary.residualShares > 0 ? 'warn' : 'info',
+      `flatten sold ${summary.filledShares} share(s); residual ${summary.residualShares}`,
+      { ...summary },
+    );
+    this.emitState();
+    return summary;
+  }
+
+  private resetKill(): void {
+    this.riskController.resetKill();
+    this.killReason = null;
+    if (this.status === 'killed') {
+      this.status = 'running';
+      if (this.session !== null) {
+        const next: PaperSession = {
+          ...this.session,
+          status: 'running',
+          endedAt: null,
+          endingEquity: null,
+          stopReason: null,
+        };
+        this.session = next;
+        this.db.updateRun(next.id, {
+          status: next.status,
+          endedAt: next.endedAt,
+          endingEquity: next.endingEquity,
+          stopReason: next.stopReason,
+        });
+      }
+    }
+    this.recordEvent('kill_switch_reset', 'info', 'kill switch reset', null);
+    this.emitState();
+  }
+
+  public async control(action: ControlRequest['action'], actor = 'operator'): Promise<void> {
+    let detail: Record<string, unknown> = {};
     switch (action) {
       case 'start':
         await this.start();
-        return;
+        break;
       case 'stop':
         this.stop();
-        return;
+        break;
+      case 'pause':
+        detail = { canceledOrders: this.pause() };
+        break;
+      case 'resume':
+        this.resume();
+        break;
+      case 'cancel-all':
+        detail = { canceledOrders: this.cancelAll() };
+        break;
+      case 'flatten':
+        detail = { ...this.flatten() };
+        break;
       case 'kill':
         this.kill('operator kill switch');
-        return;
+        break;
       case 'reset-kill':
-        this.riskController.resetKill();
-        this.killReason = null;
-        if (this.status === 'killed') {
-          this.status = 'running';
-          if (this.session !== null) {
-            const next: PaperSession = {
-              ...this.session,
-              status: 'running',
-              endedAt: null,
-              endingEquity: null,
-              stopReason: null,
-            };
-            this.session = next;
-            this.db.updateRun(next.id, {
-              status: next.status,
-              endedAt: next.endedAt,
-              endingEquity: next.endingEquity,
-              stopReason: next.stopReason,
-            });
-          }
-        }
-        this.recordEvent('kill_switch_reset', 'info', 'kill switch reset', null);
-        this.emitState();
-        return;
+        this.resetKill();
+        break;
       default:
         throw new Error(`unsupported control action: ${String(action)}`);
     }
+    this.recordEvent('operator_action', 'info', `operator action: ${action}`, {
+      action,
+      actor,
+      ...detail,
+    });
+    this.emitState();
   }
 
   public ingestBook(rawBook: OrderBook, allowTrading = true): void {
@@ -509,7 +628,8 @@ export class PolyHunterEngine implements EnginePort {
     const provider = this.config.demoMode
       ? {
           name: 'demo-generator',
-          connected: this.status === 'running' || this.status === 'killed',
+          connected:
+            this.status === 'running' || this.status === 'paused' || this.status === 'killed',
           lastMessageAt: this.feedHealth.lastBook,
           reconnectCount: 0,
           error: null,
@@ -576,6 +696,10 @@ export class PolyHunterEngine implements EnginePort {
     return this.db.listRuns(Math.max(1, Math.min(limit, 100)));
   }
 
+  public events(limit = 50): readonly EngineEvent[] {
+    return this.db.listEvents(Math.max(1, Math.min(limit, 200)));
+  }
+
   public sessionReport(id: string): SessionReport | null {
     const session = this.db.getRun(id);
     if (session === null) {
@@ -623,6 +747,7 @@ export class PolyHunterEngine implements EnginePort {
       session: this.session,
       sessions: this.sessions(20),
       feedHealth: this.feedHealth.snapshot(now),
+      events: this.events(20),
       markets,
       portfolio,
       trades: sessionId === undefined ? [] : this.trades(100, sessionId),
@@ -1107,7 +1232,7 @@ export class PolyHunterEngine implements EnginePort {
       this.portfolioSnapshot.equity,
       this.portfolioSnapshot.totalPnl,
     );
-    if (this.status === 'running') {
+    if (this.status === 'running' || this.status === 'paused') {
       const autoKillReason = this.riskController.autoKillReason(this.portfolioSnapshot);
       if (autoKillReason !== null) {
         this.kill(autoKillReason, 'auto');
@@ -1171,7 +1296,7 @@ export class PolyHunterEngine implements EnginePort {
   }
 
   private checkFeedFreshness(): void {
-    if (this.status !== 'running') {
+    if (this.status !== 'running' && this.status !== 'paused') {
       return;
     }
     const reference = this.feedHealth.lastBook ?? this.startedAt;

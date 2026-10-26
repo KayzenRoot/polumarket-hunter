@@ -103,9 +103,9 @@ export const api = {
   },
   marketDetail: (tokenId: string): Promise<MarketDetail> =>
     request<MarketDetail>(`/api/markets/${encodeURIComponent(tokenId)}`),
-  control: (action: ControlRequest['action']): Promise<StateResponse> =>
+  control: (action: ControlRequest['action'], actor = 'dashboard'): Promise<StateResponse> =>
     request<StateResponse>('/api/control', {
       method: 'POST',
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ action, actor }),
     }),
 };

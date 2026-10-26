@@ -3,7 +3,7 @@ import { formatDuration, formatTime } from '@polyhunter/core';
 import { useState } from 'react';
 import { getApiToken, setApiToken } from '../api.js';
 import type { ConnectionState } from '../useDashboard.js';
-import { KeyIcon, KillIcon, LogoIcon, PlayIcon, StopIcon } from './Icons.js';
+import { KeyIcon, KillIcon, LogoIcon, PauseIcon, PlayIcon, StopIcon } from './Icons.js';
 import { StatusPill } from './StatusPill.js';
 
 interface TopBarProps {
@@ -35,7 +35,8 @@ function geoLabel(health: EngineHealth): string {
 
 export function TopBar({ health, connection, controlPending, onControl }: TopBarProps) {
   const [token, setTokenState] = useState(getApiToken() ?? '');
-  const running = health.status === 'running' || health.status === 'killed';
+  const running = health.status === 'running';
+  const paused = health.status === 'paused';
 
   const editToken = (): void => {
     const next = window.prompt(
@@ -107,16 +108,48 @@ export function TopBar({ health, connection, controlPending, onControl }: TopBar
             <PlayIcon width={14} height={14} />
             Reset kill
           </button>
+        ) : paused ? (
+          <>
+            <button
+              type="button"
+              className="button button-primary"
+              disabled={controlPending}
+              onClick={() => onControl('resume')}
+            >
+              <PlayIcon width={14} height={14} />
+              Resume
+            </button>
+            <button
+              type="button"
+              className="button button-ghost"
+              disabled={controlPending}
+              onClick={() => onControl('stop')}
+            >
+              <StopIcon width={14} height={14} />
+              Stop
+            </button>
+          </>
         ) : running ? (
-          <button
-            type="button"
-            className="button button-ghost"
-            disabled={controlPending}
-            onClick={() => onControl('stop')}
-          >
-            <StopIcon width={14} height={14} />
-            Stop
-          </button>
+          <>
+            <button
+              type="button"
+              className="button button-ghost"
+              disabled={controlPending}
+              onClick={() => onControl('pause')}
+            >
+              <PauseIcon width={14} height={14} />
+              Pause
+            </button>
+            <button
+              type="button"
+              className="button button-ghost"
+              disabled={controlPending}
+              onClick={() => onControl('stop')}
+            >
+              <StopIcon width={14} height={14} />
+              Stop
+            </button>
+          </>
         ) : (
           <button
             type="button"

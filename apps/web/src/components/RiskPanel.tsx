@@ -1,4 +1,4 @@
-import type { EngineHealth, PortfolioSnapshot, RiskState } from '@polyhunter/core';
+import type { ControlRequest, EngineHealth, PortfolioSnapshot, RiskState } from '@polyhunter/core';
 import { formatPct, formatSignedUsd, formatUsd } from '@polyhunter/core';
 import { AlertIcon, CheckIcon } from './Icons.js';
 import { StatusPill } from './StatusPill.js';
@@ -34,10 +34,14 @@ export function RiskPanel({
   risk,
   portfolio,
   health,
+  controlPending,
+  onControl,
 }: {
   risk: RiskState;
   portfolio: PortfolioSnapshot;
   health: EngineHealth;
+  controlPending: boolean;
+  onControl: (action: ControlRequest['action']) => void;
 }) {
   const lossUsage = Math.max(0, -risk.dailyPnl);
   const exposureTone = portfolio.exposure / risk.limits.maxTotalNotional > 0.8 ? 'warn' : 'ok';
@@ -60,6 +64,29 @@ export function RiskPanel({
           Kill reason: {health.killReason}
         </p>
       ) : null}
+
+      <div className="operator-controls">
+        <button
+          type="button"
+          className="ghost-button"
+          disabled={controlPending}
+          onClick={() => onControl('cancel-all')}
+        >
+          Cancel all orders
+        </button>
+        <button
+          type="button"
+          className="ghost-button"
+          disabled={controlPending}
+          onClick={() => {
+            if (window.confirm('Flatten every paper position at the current bid?')) {
+              onControl('flatten');
+            }
+          }}
+        >
+          Flatten paper inventory
+        </button>
+      </div>
 
       <div className="meter-grid">
         <Meter

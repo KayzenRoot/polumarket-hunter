@@ -25,7 +25,17 @@ export interface BuildAppOptions {
 }
 
 const controlSchema = z.object({
-  action: z.enum(['start', 'stop', 'kill', 'reset-kill']),
+  action: z.enum([
+    'start',
+    'stop',
+    'pause',
+    'resume',
+    'cancel-all',
+    'flatten',
+    'kill',
+    'reset-kill',
+  ]),
+  actor: z.string().min(1).max(64).optional(),
 });
 
 const tokenParamsSchema = z.object({
@@ -115,6 +125,13 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   app.get('/api/health', async () => ok(engine.health()));
   app.get('/api/state', async () => ok(engine.state()));
   app.get('/api/sessions', async () => ok(engine.sessions(50)));
+  app.get('/api/events', async (request, reply) => {
+    const parsed = limitQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.code(400).send(fail('invalid_query', 'invalid limit'));
+    }
+    return ok(engine.events(parsed.data.limit));
+  });
 
   app.get('/api/sessions/:sessionId/report', async (request, reply) => {
     const parsed = sessionParamsSchema.safeParse(request.params);
@@ -187,10 +204,15 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       if (!parsed.success) {
         return reply
           .code(400)
-          .send(fail('invalid_control', 'action must be start, stop, kill or reset-kill'));
+          .send(
+            fail(
+              'invalid_control',
+              'action must be start, stop, pause, resume, cancel-all, flatten, kill or reset-kill',
+            ),
+          );
       }
       try {
-        await engine.control(parsed.data.action);
+        await engine.control(parsed.data.action, parsed.data.actor);
         return ok(engine.state());
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

@@ -491,6 +491,60 @@ describe('paper engine', () => {
     expect(engine.health().status).toBe('stopped');
   });
 
+  it('pauses new entries while keeping the feed and resumes', async () => {
+    const { engine, clock, db } = harness();
+    await engine.start();
+    engine.ingestBook(quoteBook(clock.now()));
+    expect(engine.state().portfolio.openOrders).toBe(1);
+
+    await engine.control('pause', 'dashboard');
+    expect(engine.health().status).toBe('paused');
+    expect(engine.state().portfolio.openOrders).toBe(0);
+
+    clock.advance(1000);
+    engine.ingestBook(quoteBook(clock.now()));
+    const pausedSignals = db.listSignals();
+    expect(pausedSignals[0]?.accepted).toBe(false);
+    expect(pausedSignals[0]?.reasons.join(' ')).toContain('paused');
+    expect(engine.state().portfolio.openOrders).toBe(0);
+
+    await engine.control('resume', 'dashboard');
+    expect(engine.health().status).toBe('running');
+    clock.advance(1000);
+    engine.ingestBook(quoteBook(clock.now()));
+    expect(engine.state().portfolio.openOrders).toBe(1);
+  });
+
+  it('cancels all resting orders and audits the actor', async () => {
+    const { engine, clock, db } = harness();
+    await engine.start();
+    engine.ingestBook(quoteBook(clock.now()));
+    expect(engine.state().portfolio.openOrders).toBe(1);
+
+    await engine.control('cancel-all', 'dashboard');
+    expect(engine.state().portfolio.openOrders).toBe(0);
+    const event = db.listEvents().find((item) => item.kind === 'operator_action');
+    expect(event?.message).toContain('cancel-all');
+    expect(event?.details).toContain('dashboard');
+  });
+
+  it('flattens paper inventory at the current bid', async () => {
+    const { engine, clock, db } = harness();
+    await engine.start();
+    engine.ingestBook(quoteBook(clock.now()));
+    clock.advance(1000);
+    engine.ingestBook(crossingBook(clock.now()));
+    expect(engine.state().portfolio.positions).toHaveLength(1);
+
+    await engine.control('flatten', 'dashboard');
+    expect(engine.state().portfolio.positions).toHaveLength(0);
+    expect(engine.state().portfolio.openOrders).toBe(0);
+    const sells = db.listTrades().filter((trade) => trade.side === 'SELL');
+    expect(sells.length).toBeGreaterThan(0);
+    expect(sells[0]?.size).toBeGreaterThan(0);
+    expect(db.listEvents().map((item) => item.kind)).toContain('flattened');
+  });
+
   it('records a session on start and closes it on stop', async () => {
     const { engine, db, clock } = harness();
     await engine.start();
