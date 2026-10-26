@@ -145,6 +145,10 @@ Risk controls are fail-closed. See [docs/STRATEGY.md](docs/STRATEGY.md) and
 | `npm run backtest -- --file <recording>` | Replay a recording through the strategy         |
 | `npm run demo`                           | Deterministic synthetic backtest                |
 | `npm run doctor`                         | Runtime, config, DB, provider and clock checks  |
+| `npm run db:backup`                      | Consistent SQLite backup with verification      |
+| `npm run db:restore -- --file <backup>`  | Restore a verified backup (requires `--yes`)    |
+| `npm run db:prune -- --dry-run`          | Preview age/session retention cleanup           |
+| `npm run data:export -- --session <id>`  | Export session trades/signals to CSV            |
 | `npm run ecc:sync`                       | Refresh curated ECC skills/rules                |
 
 ## Recording and replay

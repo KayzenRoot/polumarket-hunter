@@ -38,6 +38,10 @@
     "backtest": "tsx --tsconfig tsconfig.dev.json scripts/backtest.ts",
     "demo": "tsx --tsconfig tsconfig.dev.json scripts/demo.ts",
     "doctor": "tsx --tsconfig tsconfig.dev.json scripts/doctor.ts",
+    "db:backup": "tsx --tsconfig tsconfig.dev.json scripts/db-backup.ts",
+    "db:restore": "tsx --tsconfig tsconfig.dev.json scripts/db-restore.ts",
+    "db:prune": "tsx --tsconfig tsconfig.dev.json scripts/db-prune.ts",
+    "data:export": "tsx --tsconfig tsconfig.dev.json scripts/data-export.ts",
     "ecc:sync": "node scripts/sync-ecc.mjs"
   },
   "devDependencies": {

@@ -16,6 +16,36 @@ export interface EventRecord {
   readonly details: string | null;
 }
 
+export interface PruneOptions {
+  readonly before: number;
+  readonly keepSessionIds?: readonly string[];
+  readonly dryRun?: boolean;
+}
+
+export interface PruneCounts {
+  readonly sessions: number;
+  readonly trades: number;
+  readonly signals: number;
+  readonly snapshots: number;
+  readonly events: number;
+}
+
+export interface DatabaseVerification {
+  readonly ok: boolean;
+  readonly integrity: string;
+  readonly tables: readonly string[];
+  readonly missing: readonly string[];
+}
+
+export const EXPECTED_TABLES = [
+  'markets',
+  'signals',
+  'trades',
+  'portfolio_snapshots',
+  'runs',
+  'events',
+] as const;
+
 type SqlValue = string | number | bigint | Uint8Array | null;
 
 function asString(value: SqlValue | undefined): string {
@@ -543,6 +573,100 @@ export class PolyHunterDb {
   public listRuns(limit = 20): PaperSession[] {
     const rows = this.db.prepare(`SELECT * FROM runs ORDER BY started_at DESC LIMIT ?`).all(limit);
     return rows.map(mapSession);
+  }
+
+  public pruneBefore(options: PruneOptions): PruneCounts {
+    const before = Math.floor(options.before);
+    const empty: PruneCounts = {
+      sessions: 0,
+      trades: 0,
+      signals: 0,
+      snapshots: 0,
+      events: 0,
+    };
+    if (!Number.isFinite(before)) {
+      return empty;
+    }
+
+    const protectedIds = new Set(options.keepSessionIds ?? []);
+    for (const row of this.db.prepare("SELECT id FROM runs WHERE status = 'running'").all()) {
+      protectedIds.add(asString(row.id));
+    }
+    const ids = [...protectedIds];
+
+    const scope = (
+      timeColumn: string,
+      sessionColumn: string,
+    ): {
+      readonly sql: string;
+      readonly params: SqlValue[];
+    } => {
+      let sql = `${timeColumn} < ?`;
+      const params: SqlValue[] = [before];
+      if (ids.length > 0) {
+        sql += ` AND ${sessionColumn} NOT IN (${ids.map(() => '?').join(', ')})`;
+        params.push(...ids);
+      }
+      return { sql, params };
+    };
+
+    const count = (table: string, timeColumn: string, sessionColumn: string): number => {
+      const scoped = scope(timeColumn, sessionColumn);
+      const row = this.db
+        .prepare(`SELECT COUNT(*) AS total FROM ${table} WHERE ${scoped.sql}`)
+        .get(...scoped.params);
+      return asNumber(row?.total);
+    };
+
+    const eventsRow = this.db
+      .prepare('SELECT COUNT(*) AS total FROM events WHERE at < ?')
+      .get(before);
+    const counts: PruneCounts = {
+      sessions: count('runs', 'started_at', 'id'),
+      trades: count('trades', 'at', 'session_id'),
+      signals: count('signals', 'at', 'session_id'),
+      snapshots: count('portfolio_snapshots', 'at', 'session_id'),
+      events: asNumber(eventsRow?.total),
+    };
+
+    if (options.dryRun === true) {
+      return counts;
+    }
+
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      for (const table of ['trades', 'signals', 'portfolio_snapshots'] as const) {
+        const scoped = scope('at', 'session_id');
+        this.db.prepare(`DELETE FROM ${table} WHERE ${scoped.sql}`).run(...scoped.params);
+      }
+      const sessions = scope('started_at', 'id');
+      this.db.prepare(`DELETE FROM runs WHERE ${sessions.sql}`).run(...sessions.params);
+      this.db.prepare('DELETE FROM events WHERE at < ?').run(before);
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
+    return counts;
+  }
+
+  public backupTo(path: string): void {
+    const escaped = path.replaceAll("'", "''");
+    this.db.exec(`VACUUM INTO '${escaped}'`);
+  }
+
+  public static verify(path: string): DatabaseVerification {
+    const database = new DatabaseSync(path, { readOnly: true });
+    try {
+      const integrityRow = database.prepare('PRAGMA integrity_check').get();
+      const integrity = asString(integrityRow?.integrity_check);
+      const rows = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all();
+      const tables = rows.map((row) => asString(row.name)).sort();
+      const missing = EXPECTED_TABLES.filter((table) => !tables.includes(table));
+      return { ok: integrity === 'ok' && missing.length === 0, integrity, tables, missing };
+    } finally {
+      database.close();
+    }
   }
 
   public insertEvent(event: EventRecord): void {
