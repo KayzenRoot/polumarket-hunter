@@ -1,0 +1,136 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or SHA to package
+        required: true
+        default: main
+      dry_run:
+        description: Package without publishing a GitHub release
+        type: boolean
+        default: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PUBLISH_REF: ${{ inputs.ref || github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Clean install
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm rebuild esbuild
+
+      - name: Build
+        run: npm run build
+
+      - name: Generate CycloneDX SBOM
+        run: npm sbom --sbom-format=cyclonedx --omit=dev --package-lock-only > sbom.cdx.json
+
+      - name: Package production artifact
+        run: |
+          set -euo pipefail
+          npm prune --omit=dev --no-audit --no-fund
+          SAFE_REF="${PUBLISH_REF//\//-}"
+          ARTIFACT="polyhunter-${SAFE_REF}-linux-x64.tar.gz"
+          tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner \
+            --use-compress-program='gzip -9n' \
+            -cf "$ARTIFACT" \
+            package.json package-lock.json README.md .env.example docs \
+            node_modules packages apps/server/package.json apps/server/dist apps/web/dist
+          sha256sum "$ARTIFACT" sbom.cdx.json > SHA256SUMS
+          sha256sum -c SHA256SUMS
+
+      - name: Write release notes
+        run: |
+          set -euo pipefail
+          TAG="${PUBLISH_REF}"
+          ARTIFACT="polyhunter-${PUBLISH_REF//\//-}-linux-x64.tar.gz"
+          BASE="https://github.com/${GITHUB_REPOSITORY}/blob/${TAG}"
+          if [ -f docs/research/v0.1-evidence.md ]; then
+            RESEARCH="[decision memo](${BASE}/docs/research/v0.1-evidence.md)"
+          else
+            RESEARCH="Decision memo pending (#29); this tag is not the production evidence gate."
+          fi
+          cat > release-notes.md <<EOF
+          # PolyHunter ${TAG}
+
+          Local, single-user, paper-first production artifact.
+
+          - [Production contract](${BASE}/docs/PRODUCTION-CONTRACT.md)
+          - ${RESEARCH}
+          - [Production plan](${BASE}/docs/PRODUCTION-PLAN.md)
+          - [Runbook](${BASE}/docs/RUNBOOK.md)
+          - [Fees and assumptions](${BASE}/docs/FEES.md)
+
+          ## Install
+
+          1. Verify SHA256SUMS with: sha256sum -c SHA256SUMS
+          2. Extract ${ARTIFACT}.
+          3. Copy .env.example to .env and set DATABASE_PATH, RECORD_DIR and any overrides.
+          4. Run: node apps/server/dist/main.js with Node 24.
+
+          No wallet, private key or exchange secret is needed or included. Live trading is not
+          implemented. The venue geoblock remains enforced; do not bypass it.
+
+          ## Evidence
+
+          - SBOM: sbom.cdx.json (CycloneDX)
+          - Checksums: SHA256SUMS
+          - Artifact: ${ARTIFACT}
+          EOF
+
+      - name: Upload dry-run assets
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-dry-run
+          path: |
+            polyhunter-*-linux-x64.tar.gz
+            sbom.cdx.json
+            SHA256SUMS
+          retention-days: 7
+
+      - name: Publish release
+        if: ${{ github.event_name == 'push' || inputs.dry_run == false }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ARTIFACT="polyhunter-${PUBLISH_REF//\//-}-linux-x64.tar.gz"
+          if gh release view "$PUBLISH_REF" >/dev/null 2>&1; then
+            gh release upload "$PUBLISH_REF" "$ARTIFACT" sbom.cdx.json SHA256SUMS --clobber
+            gh release edit "$PUBLISH_REF" --notes-file release-notes.md
+          else
+            gh release create "$PUBLISH_REF" "$ARTIFACT" sbom.cdx.json SHA256SUMS \
+              --title "PolyHunter $PUBLISH_REF" \
+              --notes-file release-notes.md \
+              --verify-tag
+          fi
