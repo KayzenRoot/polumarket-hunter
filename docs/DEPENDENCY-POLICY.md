@@ -87,6 +87,25 @@ unhashed `pip install semgrep==...` in CI.
 Docker base images are pinned by digest in the `Dockerfile`; update the digest deliberately and
 rebuild the image. The Docker CI job is the verification.
 
+### Accepted Python scanner advisories
+
+Date: **2026-10-26**. Owner: **KayzenRoot**. Review by: **2026-12-31**.
+
+| Advisory              | Package             | Constraint  | Why accepted                                                                |
+| --------------------- | ------------------- | ----------- | --------------------------------------------------------------------------- |
+| `GHSA-84m7-p3x7-pcfv` | `mcp`               | `< 1.30.0`  | Semgrep 1.182.1 hard-pins `mcp==1.29.0`; no newer Semgrep release exists    |
+| `GHSA-xcq7-p3pf-p88h` | `opentelemetry-api` | `<= 1.45.0` | Semgrep 1.182.1 pins `opentelemetry-api~=1.37.0`; latest Semgrep is 1.182.1 |
+
+Both packages exist only in the CI scanner virtual environment created from
+`requirements/security.txt`. They are not part of the application artifact, the Docker image or the
+user runtime. The Semgrep job is a one-shot CLI scan with `SEMGREP_SEND_METRICS=off`; it does not
+start an MCP HTTP server and does not receive repository secrets beyond the workflow token.
+
+Mitigations: ephemeral GitHub-hosted runner, least-privilege workflow permissions, hash-pinned
+installation, no scanner server exposed, and no provider credentials on the runner. Dependabot
+alerts for these two advisories are dismissed as **tolerable risk** with a link to this section.
+Revisit when Semgrep publishes a release that permits the patched versions, or by 2026-12-31.
+
 ## GitHub Actions
 
 Every third-party action uses a full commit SHA with the release tag in a comment. Dependabot
