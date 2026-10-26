@@ -76,6 +76,7 @@ export function generateSyntheticBooks(options: SyntheticBookOptions = {}): Orde
       tokenId,
       marketId,
       outcome,
+      tickSize,
       timestamp: startAt + index * intervalMs,
       bids: makeLevels(bid, tickSize, 'bid', random),
       asks: makeLevels(ask, tickSize, 'ask', random),

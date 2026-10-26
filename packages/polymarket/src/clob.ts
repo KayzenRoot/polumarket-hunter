@@ -33,6 +33,7 @@ export function mapRawBook(raw: RawBook, meta: TokenMetadata): OrderBook {
     tokenId: meta.tokenId,
     marketId: meta.marketId,
     outcome: meta.outcome,
+    tickSize: raw.tickSize ?? meta.tickSize,
     timestamp: raw.timestamp,
     bids: raw.bids,
     asks: raw.asks,
@@ -55,6 +56,7 @@ export function parseRawBook(payload: unknown): RawBook | null {
     bids: mapLevels(raw.bids),
     asks: mapLevels(raw.asks),
     lastTradePrice: raw.last_trade_price ?? null,
+    tickSize: raw.tick_size ?? null,
   };
 }
 

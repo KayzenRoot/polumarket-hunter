@@ -281,7 +281,7 @@ describe('paper engine', () => {
       clob: {
         getBooks: async () => [
           {
-            token: { marketId: 'market-1', tokenId: 'yes-token', outcome: 'YES' },
+            token: { marketId: 'market-1', tokenId: 'yes-token', outcome: 'YES', tickSize: 0.01 },
             book: {
               conditionId: 'condition-1',
               assetId: 'yes-token',
@@ -290,6 +290,7 @@ describe('paper engine', () => {
               bids: [{ price: 0.48, size: 300 }],
               asks: [{ price: 0.5, size: 300 }],
               lastTradePrice: 0.49,
+              tickSize: 0.01,
             },
             error: null,
           },
@@ -465,7 +466,7 @@ describe('paper engine', () => {
       clob: {
         getBooks: async () => [
           {
-            token: { marketId: 'market-1', tokenId: 'yes-token', outcome: 'YES' },
+            token: { marketId: 'market-1', tokenId: 'yes-token', outcome: 'YES', tickSize: 0.01 },
             book: {
               conditionId: 'condition-1',
               assetId: 'yes-token',
@@ -474,6 +475,7 @@ describe('paper engine', () => {
               bids: [{ price: 0.48, size: 300 }],
               asks: [{ price: 0.5, size: 300 }],
               lastTradePrice: 0.49,
+              tickSize: 0.01,
             },
             error: null,
           },
@@ -508,16 +510,31 @@ describe('paper engine', () => {
     engines.push(engine);
     await engine.start();
 
+    if (captured === null) {
+      throw new Error('expected a captured socket configuration');
+    }
+    const socketOptions: MarketSocketOptions = captured;
+    socketOptions.onEvent?.({
+      type: 'tick_size_change',
+      tokenId: 'yes-token',
+      oldTickSize: 0.01,
+      newTickSize: 0.001,
+      at: 1_000_000,
+    });
+    expect(engine.state().markets[0]?.market.tickSize).toBe(0.001);
+
     engine.ingestBook(
       makeBook({
         tokenId: 'yes-token',
         marketId: 'market-1',
         outcome: 'YES',
+        tickSize: 0.001,
         timestamp: 1_000_000,
         bids: [{ price: 0.48, size: 300 }],
         asks: [{ price: 0.5, size: 100 }],
       }),
     );
+    expect(engine.marketDetail('yes-token')?.book?.tickSize).toBe(0.001);
     engine.ingestBook(
       makeBook({
         tokenId: 'yes-token',
@@ -533,8 +550,8 @@ describe('paper engine', () => {
     if (captured === null) {
       throw new Error('expected a captured socket configuration');
     }
-    const socketOptions: MarketSocketOptions = captured;
-    socketOptions.onEvent?.({
+    const resolvedSocketOptions: MarketSocketOptions = captured;
+    resolvedSocketOptions.onEvent?.({
       type: 'market_resolved',
       conditionId: 'condition-1',
       winningAssetId: 'yes-token',

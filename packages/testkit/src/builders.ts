@@ -20,6 +20,7 @@ export function makeBook(overrides: Partial<OrderBook> = {}): OrderBook {
     tokenId: 'yes-token',
     marketId: 'market-1',
     outcome: 'YES',
+    tickSize: 0.01,
     timestamp: 1_000_000,
     bids: [
       { price: 0.48, size: 200 },
@@ -229,6 +230,7 @@ export function makeClobBook(overrides: Record<string, unknown> = {}): Record<st
       { price: '0.50', size: '200' },
       { price: '0.51', size: '300' },
     ],
+    tick_size: '0.01',
     ...overrides,
   };
 }

@@ -219,6 +219,7 @@ export class MarketMessageNormalizer {
         bids: raw.bids,
         asks: raw.asks,
         lastTradePrice: raw.last_trade_price ?? existing?.lastTradePrice ?? null,
+        tickSize: raw.tick_size ?? existing?.tickSize ?? null,
       },
       meta,
     );
@@ -417,10 +418,17 @@ export class MarketSocket {
       for (const book of update.books) {
         this.options.onBook(book);
       }
-      if (this.options.onEvent !== undefined) {
-        for (const marketEvent of update.events) {
-          this.options.onEvent(marketEvent);
+      for (const marketEvent of update.events) {
+        if (marketEvent.type === 'tick_size_change') {
+          const meta = this.tokenMap.get(marketEvent.tokenId);
+          if (meta !== undefined) {
+            this.tokenMap.set(marketEvent.tokenId, {
+              ...meta,
+              tickSize: marketEvent.newTickSize,
+            });
+          }
         }
+        this.options.onEvent?.(marketEvent);
       }
     });
 

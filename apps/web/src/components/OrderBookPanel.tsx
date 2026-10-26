@@ -76,7 +76,10 @@ export function OrderBookPanel({ detail, loading, onClose }: OrderBookPanelProps
             FLAT
           </StatusPill>
         )}
-        <span className="muted">last update {formatDateTime(detail.book?.timestamp ?? null)}</span>
+        <span className="muted">
+          last update {formatDateTime(detail.book?.timestamp ?? null)} · tick{' '}
+          {formatPrice(detail.market.tickSize)}
+        </span>
       </div>
 
       {loading ? <div className="skeleton-line" /> : null}

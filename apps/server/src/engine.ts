@@ -627,6 +627,7 @@ export class PolyHunterEngine implements EnginePort {
         marketId: market.id,
         tokenId: market.yesTokenId,
         outcome: 'YES',
+        tickSize: market.tickSize,
       });
       this.db.upsertMarket(market, now);
     }
@@ -744,6 +745,7 @@ export class PolyHunterEngine implements EnginePort {
         marketId: market.id,
         tokenId: market.yesTokenId,
         outcome: 'YES',
+        tickSize: market.tickSize,
       };
       this.tokens.set(token.tokenId, token);
       this.subscriptions.push(token);
@@ -819,6 +821,14 @@ export class PolyHunterEngine implements EnginePort {
     }
 
     if (event.type === 'tick_size_change') {
+      const token = this.tokens.get(event.tokenId);
+      if (token !== undefined) {
+        this.tokens.set(token.tokenId, { ...token, tickSize: event.newTickSize });
+        const market = this.markets.get(token.marketId);
+        if (market !== undefined) {
+          this.markets.set(market.id, { ...market, tickSize: event.newTickSize });
+        }
+      }
       this.recordEvent('tick_size_change', 'info', 'market tick size changed', {
         tokenId: event.tokenId,
         oldTickSize: event.oldTickSize,

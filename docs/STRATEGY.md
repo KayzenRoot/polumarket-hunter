@@ -15,6 +15,10 @@ spread     = bestAsk − bestBid
 depth      = sum of the top N level sizes on the relevant side
 ```
 
+Quotes are rounded to the **market tick size** (0.01, 0.001 or 0.0001), not a global default.
+The tick comes from Gamma metadata and the book; a WebSocket `tick_size_change` updates subsequent
+book snapshots and decisions.
+
 The microprice weights the side with less size more heavily. It is a **local microstructure
 estimate**, not a forecast of the outcome probability.
 

@@ -56,6 +56,7 @@ export const clobBookSchema = z
     bids: z.array(clobLevelSchema),
     asks: z.array(clobLevelSchema),
     last_trade_price: numericString.nullable().optional(),
+    tick_size: numericString.nullable().optional(),
     event_type: z.string().optional(),
   })
   .passthrough();

@@ -64,6 +64,7 @@ async function main(): Promise<void> {
     marketId: market.id,
     tokenId: market.yesTokenId,
     outcome: 'YES',
+    tickSize: market.tickSize,
   };
 
   try {
