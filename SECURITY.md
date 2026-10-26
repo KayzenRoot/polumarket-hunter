@@ -57,4 +57,5 @@ Out of scope:
 
 Dependabot, OSV-Scanner, dependency review and npm audit are enabled. Do not disable a gate to land
 a feature; update the dependency or document an explicit, time-bounded exception with owner
-approval.
+approval. The exact gates and exception schema are in
+[`docs/DEPENDENCY-POLICY.md`](docs/DEPENDENCY-POLICY.md).

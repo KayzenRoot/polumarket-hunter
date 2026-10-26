@@ -2,27 +2,31 @@
 
 ## What runs in this repository (no external app required)
 
-| Workflow                          | What it proves                                                                                        |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `ci.yml` → `quality`              | Biome lint/format, strict typecheck, unit/integration/property tests, coverage gate, production build |
-| `ci.yml` → `windows-quality`      | Clean `npm ci`, lint, typecheck, coverage and build on Windows 24                                     |
-| `ci.yml` → `e2e`                  | Playwright dashboard, navigation, kill switch and reset flow                                          |
-| `ci.yml` → `docker`               | Builds the image and probes a running API                                                             |
-| `release.yml`                     | Tag-driven artifact, CycloneDX SBOM and SHA256 checksums                                              |
-| `codeql.yml` → `codeql`           | GitHub CodeQL security-extended analysis for JavaScript/TypeScript                                    |
-| `security.yml` → `secret-scan`    | Gitleaks full-history secret scan                                                                     |
-| `security.yml` → `semgrep`        | Semgrep `p/ci` at ERROR severity; SARIF uploaded                                                      |
-| `security.yml` → `osv`            | OSV-Scanner against `package-lock.json`                                                               |
-| `security.yml` → `workflow-audit` | actionlint + zizmor (SARIF uploaded)                                                                  |
-| `security.yml` → `security-gate`  | Aggregate gate for the four security jobs above                                                       |
-| `scorecard.yml` → `scorecard`     | OpenSSF Scorecard, published and uploaded as SARIF                                                    |
-| `dependency-review.yml`           | Blocks PRs that introduce high-severity vulnerable dependencies                                       |
-| `pr-title.yml`                    | Conventional-commit PR titles                                                                         |
-| Dependabot                        | Weekly npm and GitHub Actions updates, grouped minor/patch                                            |
+| Workflow                          | What it proves                                                                              |
+| --------------------------------- | ------------------------------------------------------------------------------------------- |
+| `ci.yml` → `quality`              | npm audit gate, Biome lint/format, strict typecheck, tests, coverage gate, production build |
+| `ci.yml` → `windows-quality`      | Clean `npm ci`, lint, typecheck, coverage and build on Windows 24                           |
+| `ci.yml` → `e2e`                  | Playwright dashboard, navigation, kill switch and reset flow                                |
+| `ci.yml` → `docker`               | Builds the image and probes a running API                                                   |
+| `release.yml`                     | Tag-driven artifact, CycloneDX SBOM and SHA256 checksums                                    |
+| `codeql.yml` → `codeql`           | GitHub CodeQL security-extended analysis for JavaScript/TypeScript                          |
+| `security.yml` → `secret-scan`    | Gitleaks full-history secret scan                                                           |
+| `security.yml` → `semgrep`        | Semgrep `p/ci` at ERROR severity; SARIF uploaded                                            |
+| `security.yml` → `osv`            | OSV-Scanner against `package-lock.json`                                                     |
+| `security.yml` → `workflow-audit` | actionlint + zizmor (SARIF uploaded)                                                        |
+| `security.yml` → `security-gate`  | Aggregate gate for the four security jobs above                                             |
+| `scorecard.yml` → `scorecard`     | OpenSSF Scorecard, published and uploaded as SARIF                                          |
+| `dependency-review.yml`           | Blocks PRs that introduce high-severity vulnerable dependencies                             |
+| `pr-title.yml`                    | Conventional-commit PR titles                                                               |
+| Dependabot                        | Weekly npm and GitHub Actions updates, grouped minor/patch                                  |
 
 All third-party actions are pinned by commit SHA. Workflow permissions are least-privilege. The
 Ubuntu quality job is hardened with `step-security/harden-runner`; the Windows lane relies on
 least-privilege permissions and SHA pinning because harden-runner is Linux-only.
+
+Dependency and advisory handling is documented in [`DEPENDENCY-POLICY.md`](DEPENDENCY-POLICY.md).
+`npm audit` is a required part of `quality`; accepted advisories live in
+`security/audit-exceptions.json` and must be time-bounded and owner-approved.
 
 ## Required checks (ruleset intent)
 
