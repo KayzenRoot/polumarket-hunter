@@ -14,6 +14,7 @@ import { FeedHealthPanel } from './components/FeedHealthPanel.js';
 import { AlertIcon, LogoIcon, RefreshIcon } from './components/Icons.js';
 import { KpiCard } from './components/KpiCard.js';
 import { MarketsTable } from './components/MarketsTable.js';
+import { OperatorLog } from './components/OperatorLog.js';
 import { OrderBookPanel } from './components/OrderBookPanel.js';
 import { PositionsTable } from './components/PositionsTable.js';
 import { ReportsView } from './components/ReportsView.js';
@@ -428,7 +429,13 @@ export default function App() {
 
                 <div className="stack">
                   <section className="card card-risk">
-                    <RiskPanel risk={risk} portfolio={portfolio} health={health} />
+                    <RiskPanel
+                      risk={risk}
+                      portfolio={portfolio}
+                      health={health}
+                      controlPending={controlPending}
+                      onControl={(action) => void control(action)}
+                    />
                   </section>
                 </div>
               </div>
@@ -589,10 +596,17 @@ export default function App() {
               </div>
               <div className="risk-layout">
                 <section className="card card-risk">
-                  <RiskPanel risk={risk} portfolio={portfolio} health={health} />
+                  <RiskPanel
+                    risk={risk}
+                    portfolio={portfolio}
+                    health={health}
+                    controlPending={controlPending}
+                    onControl={(action) => void control(action)}
+                  />
                 </section>
                 <div className="stack">
                   <FeedHealthPanel feed={state.feedHealth} health={health} />
+                  <OperatorLog events={state.events} />
                   <ConfigCard state={state} />
                   <ComplianceCard state={state} />
                 </div>

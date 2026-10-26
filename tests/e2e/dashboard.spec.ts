@@ -40,6 +40,11 @@ test.describe('PolyHunter dashboard', () => {
       page.getByRole('heading', { name: 'Freshness and provider latency' }),
     ).toBeVisible();
     await expect(page.getByText('Age p50 / p95 / p99')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Cancel all orders' })).toBeVisible();
+    await page.getByRole('button', { name: 'Pause' }).click();
+    await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();
+    await page.getByRole('button', { name: 'Resume' }).click();
+    await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
     await expect(page.getByText('Why this is paper only')).toBeVisible();
     await expect(page.getByText(/No VPN, proxy, account-sharing/)).toBeVisible();
   });

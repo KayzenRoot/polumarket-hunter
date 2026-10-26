@@ -1,5 +1,6 @@
 import type {
   ControlRequest,
+  EngineEvent,
   EngineHealth,
   MarketDetail,
   MarketView,
@@ -119,6 +120,15 @@ export function makeState(overrides: Partial<StateResponse> = {}): StateResponse
     session: makeSession(),
     sessions: [makeSession()],
     feedHealth: makeFeedHealth(),
+    events: [
+      {
+        at: 1_000_000,
+        kind: 'engine_started',
+        severity: 'info' as const,
+        message: 'paper engine started',
+        details: null,
+      },
+    ],
     markets: [makeMarketView()],
     portfolio: makePortfolio(),
     trades: [makeTrade()],
@@ -194,6 +204,10 @@ export class FakeEngine implements EnginePort {
     return id === this.reportValue.session.id ? this.reportValue : null;
   }
 
+  public events(limit: number): readonly EngineEvent[] {
+    return this.stateValue.events.slice(0, limit);
+  }
+
   public portfolio(): PortfolioSnapshot {
     return this.stateValue.portfolio;
   }
@@ -202,11 +216,21 @@ export class FakeEngine implements EnginePort {
     return this.stateValue.risk;
   }
 
-  public async control(action: ControlRequest['action']): Promise<void> {
+  public async control(action: ControlRequest['action'], actor?: string): Promise<void> {
     if (this.throwOnControl) {
       throw new Error('control failure');
     }
+    void actor;
     this.controls.push(action);
+    if (action === 'pause' || action === 'resume') {
+      this.stateValue = {
+        ...this.stateValue,
+        health: {
+          ...this.stateValue.health,
+          status: action === 'pause' ? 'paused' : 'running',
+        },
+      };
+    }
     if (action === 'kill') {
       this.stateValue = {
         ...this.stateValue,

@@ -1,5 +1,6 @@
 import type {
   ControlRequest,
+  EngineEvent,
   EngineHealth,
   MarketDetail,
   PaperSession,
@@ -19,9 +20,10 @@ export interface EnginePort {
   signals(limit: number, sessionId?: string): readonly Signal[];
   sessions(limit: number): readonly PaperSession[];
   sessionReport(id: string): SessionReport | null;
+  events(limit: number): readonly EngineEvent[];
   portfolio(): PortfolioSnapshot;
   risk(): RiskState;
-  control(action: ControlRequest['action']): Promise<void>;
+  control(action: ControlRequest['action'], actor?: string): Promise<void>;
   subscribe(listener: (state: StateResponse) => void): () => void;
   metrics(): string;
 }

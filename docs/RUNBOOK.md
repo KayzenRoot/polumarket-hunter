@@ -105,6 +105,9 @@ Recovery:
 2. Fix the cause; do not raise a limit just to resume.
 3. Reset the kill switch explicitly and watch the first books before leaving it unattended.
 
+Pause, cancel-all and flatten semantics are documented in
+[docs/OPERATOR-CONTROLS.md](OPERATOR-CONTROLS.md).
+
 ## Production-style local run
 
 ```bash

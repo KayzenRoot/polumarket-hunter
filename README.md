@@ -26,6 +26,7 @@ hard risk controls, replay/backtest and a realtime dashboard.
 - Blocks new exposure on stale or crossed books, wide spreads, missing depth, duplicate orders,
   loss limits, drawdown limits, order-rate limits and the operator kill switch; auto-kills on loss,
   drawdown or a stale feed and can post a webhook alert.
+- Pause/resume, cancel-all and flatten paper inventory, with every operator action audited.
 - Persists paper sessions, signals, trades, portfolio snapshots and events to native SQLite
   (`node:sqlite`).
 - Rebuilds a reproducible session report with fills, signals, risk rejections, equity curve and

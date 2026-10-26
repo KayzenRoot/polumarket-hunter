@@ -5,7 +5,7 @@ export type StrategyKind = 'micro-maker' | 'momentum-taker';
 
 export type StrategyAction = 'HOLD' | 'PLACE_BID' | 'PLACE_ASK' | 'TAKE_BUY' | 'TAKE_SELL';
 
-export type EngineStatus = 'starting' | 'running' | 'stopped' | 'killed' | 'error';
+export type EngineStatus = 'starting' | 'running' | 'paused' | 'stopped' | 'killed' | 'error';
 
 export type SessionStatus = 'running' | 'stopped' | 'killed' | 'error';
 
@@ -326,6 +326,7 @@ export interface StateResponse {
   readonly session: PaperSession | null;
   readonly sessions: readonly PaperSession[];
   readonly feedHealth: FeedHealthSnapshot;
+  readonly events: readonly EngineEvent[];
   readonly markets: readonly MarketView[];
   readonly portfolio: PortfolioSnapshot;
   readonly trades: readonly Trade[];
@@ -335,8 +336,25 @@ export interface StateResponse {
   readonly equityCurve: readonly EquityPoint[];
 }
 
+export interface EngineEvent {
+  readonly at: number;
+  readonly kind: string;
+  readonly severity: 'info' | 'warn' | 'error';
+  readonly message: string;
+  readonly details: string | null;
+}
+
 export interface ControlRequest {
-  readonly action: 'start' | 'stop' | 'kill' | 'reset-kill';
+  readonly action:
+    | 'start'
+    | 'stop'
+    | 'pause'
+    | 'resume'
+    | 'cancel-all'
+    | 'flatten'
+    | 'kill'
+    | 'reset-kill';
+  readonly actor?: string;
 }
 
 export interface ApiError {
