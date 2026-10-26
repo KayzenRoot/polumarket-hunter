@@ -279,6 +279,7 @@ export class MarketSocket {
   private staleTimer: ReturnType<typeof setInterval> | null = null;
   private reconnectAttempt = 0;
   private reconnects = 0;
+  private connectedAt: number | null = null;
   private lastMessageAt: number | null = null;
   private error: string | null = null;
 
@@ -392,7 +393,8 @@ export class MarketSocket {
         return;
       }
       this.connected = true;
-      this.reconnectAttempt = 0;
+      this.connectedAt = this.now();
+      this.lastMessageAt = null;
       this.error = null;
       this.sendFrame({ assets_ids: this.tokens.map((token) => token.tokenId), type: 'market' });
       this.startTimers();
@@ -408,6 +410,7 @@ export class MarketSocket {
         return;
       }
       this.lastMessageAt = this.now();
+      this.reconnectAttempt = 0;
       let payload: unknown;
       try {
         payload = typeof raw === 'string' ? JSON.parse(raw) : raw;
@@ -446,6 +449,7 @@ export class MarketSocket {
         return;
       }
       this.connected = false;
+      this.connectedAt = null;
       this.socket = null;
       this.clearTimers();
       this.emitStatus();
@@ -464,10 +468,11 @@ export class MarketSocket {
       if (!this.connected) {
         return;
       }
-      if (this.lastMessageAt === null) {
+      const lastActivity = this.lastMessageAt ?? this.connectedAt;
+      if (lastActivity === null) {
         return;
       }
-      if (this.now() - this.lastMessageAt > this.staleAfterMs) {
+      if (this.now() - lastActivity > this.staleAfterMs) {
         this.forceReconnect();
       }
     }, this.heartbeatMs);

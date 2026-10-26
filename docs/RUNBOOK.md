@@ -47,6 +47,23 @@ npm run smoke
 Expected on the current BR network: Gamma/CLOB/WS pass; geoblock is `BLOCKED (BR)`. That is not a
 smoke failure for paper mode.
 
+## Provider failure behavior
+
+The paper engine fails closed; a provider fault must never create exposure.
+
+- A stale, crossed, one-sided or missing book produces `HOLD` and no paper order. The last accepted
+  book age is exported as `polyhunter_last_book_age_ms` (`-1` means no book yet).
+- A silent or stale WebSocket triggers a reconnect. `/api/health` exposes
+  `provider.lastMessageAt`, `provider.reconnectCount` and `provider.error`; the engine also records
+  scanner failures as `scanner_refresh_failed` events.
+- CLOB `429` and `5xx` responses are retried with exponential backoff. When the retry budget is
+  exhausted the token result carries the provider error and is skipped for that scan.
+- Tick-size changes and market resolutions are applied through the stream and persisted as
+  `tick_size_change` / `market_resolved` audit events.
+
+Inspect `/api/health`, `/metrics` and the SQLite `events` table before restarting after a provider
+incident. Do not raise `BOOK_STALE_MS` or disable the stale/crossed checks to “make it trade”.
+
 ## Production-style local run
 
 ```bash

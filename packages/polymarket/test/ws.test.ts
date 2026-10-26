@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   MarketMessageNormalizer,
   MarketSocket,
+  type MarketSocketOptions,
   type TokenMetadata,
   type WebSocketLike,
 } from '../src/index.js';
@@ -269,6 +270,26 @@ function socketHarness() {
   };
 }
 
+type SocketOverrides = Partial<
+  Omit<MarketSocketOptions, 'url' | 'tokens' | 'onBook' | 'socketFactory'>
+>;
+
+function openSocket(
+  harness: ReturnType<typeof socketHarness>,
+  overrides: SocketOverrides = {},
+): MarketSocket {
+  const socket = new MarketSocket({
+    url: 'wss://example.test',
+    tokens: [YES],
+    onBook: () => undefined,
+    socketFactory: harness.factory,
+    ...overrides,
+  });
+  socket.connect();
+  harness.sockets[0]?.open();
+  return socket;
+}
+
 afterEach(() => {
   vi.useRealTimers();
 });
@@ -339,9 +360,12 @@ describe('market socket', () => {
 
     vi.advanceTimersByTime(1000);
     expect(harness.sockets[0]?.sent).toContain('PING');
+
+    vi.advanceTimersByTime(2000);
+    expect(harness.sockets[0]?.sent.filter((frame) => frame === 'PING')).toHaveLength(3);
   });
 
-  it('reconnects with backoff after the server closes', () => {
+  it('reconnects when the feed goes stale even if PONGs arrive', () => {
     vi.useFakeTimers();
     const harness = socketHarness();
     const socket = new MarketSocket({
@@ -349,10 +373,121 @@ describe('market socket', () => {
       tokens: [YES],
       onBook: () => undefined,
       socketFactory: harness.factory,
+      heartbeatMs: 1000,
+      staleAfterMs: 2000,
       reconnectBaseMs: 1000,
     });
     socket.connect();
     harness.sockets[0]?.open();
+    harness.sockets[0]?.message(JSON.stringify(bookMessage()));
+    const lastDataAt = socket.lastMessage;
+    expect(lastDataAt).not.toBeNull();
+
+    harness.sockets[0]?.message('PONG');
+    vi.advanceTimersByTime(2000);
+    expect(socket.isConnected).toBe(true);
+    expect(socket.lastMessage).toBe(lastDataAt);
+
+    vi.advanceTimersByTime(1000);
+    expect(socket.isConnected).toBe(false);
+    expect(harness.sockets[0]?.readyState).toBe(3);
+    expect(socket.reconnectCount).toBe(1);
+
+    vi.advanceTimersByTime(1000);
+    expect(harness.sockets).toHaveLength(2);
+  });
+
+  it('reconnects when the socket opens but never sends data', () => {
+    vi.useFakeTimers();
+    const harness = socketHarness();
+    const socket = new MarketSocket({
+      url: 'wss://example.test',
+      tokens: [YES],
+      onBook: () => undefined,
+      socketFactory: harness.factory,
+      heartbeatMs: 1000,
+      staleAfterMs: 2000,
+      reconnectBaseMs: 1000,
+    });
+    socket.connect();
+    harness.sockets[0]?.open();
+    expect(socket.lastMessage).toBeNull();
+
+    vi.advanceTimersByTime(3000);
+    expect(socket.isConnected).toBe(false);
+    expect(socket.reconnectCount).toBe(1);
+
+    vi.advanceTimersByTime(1000);
+    expect(harness.sockets).toHaveLength(2);
+  });
+
+  it('ignores malformed frames without dropping the connection', () => {
+    const harness = socketHarness();
+    const books: string[] = [];
+    const socket = new MarketSocket({
+      url: 'wss://example.test',
+      tokens: [YES],
+      onBook: (book) => books.push(book.tokenId),
+      socketFactory: harness.factory,
+    });
+    socket.connect();
+    harness.sockets[0]?.open();
+
+    expect(() => harness.sockets[0]?.message('{not-json')).not.toThrow();
+    expect(books).toHaveLength(0);
+    expect(socket.isConnected).toBe(true);
+  });
+
+  it('resubscribes after a reconnect', () => {
+    vi.useFakeTimers();
+    const harness = socketHarness();
+    const socket = openSocket(harness, { reconnectBaseMs: 1000 });
+    harness.sockets[0]?.serverClose();
+    vi.advanceTimersByTime(1000);
+
+    const reconnected = harness.sockets[1];
+    expect(reconnected).toBeDefined();
+    reconnected?.open();
+    const frame = JSON.parse(reconnected?.sent[0] ?? '{}') as Record<string, unknown>;
+    expect(frame).toMatchObject({ type: 'market', assets_ids: ['yes-token'] });
+    expect(socket.isConnected).toBe(true);
+  });
+
+  it('retries when the socket factory throws', () => {
+    vi.useFakeTimers();
+    const sockets: FakeSocket[] = [];
+    let attempts = 0;
+    const socket = new MarketSocket({
+      url: 'wss://example.test',
+      tokens: [YES],
+      onBook: () => undefined,
+      socketFactory: () => {
+        attempts += 1;
+        if (attempts === 1) {
+          throw new Error('constructor failed');
+        }
+        const next = new FakeSocket();
+        sockets.push(next);
+        return next;
+      },
+      reconnectBaseMs: 1000,
+    });
+
+    socket.connect();
+    expect(socket.lastError).toBe('constructor failed');
+    expect(socket.reconnectCount).toBe(1);
+    expect(sockets).toHaveLength(0);
+
+    vi.advanceTimersByTime(1000);
+    expect(sockets).toHaveLength(1);
+    sockets[0]?.open();
+    expect(socket.isConnected).toBe(true);
+  });
+
+  it('reconnects with backoff after the server closes', () => {
+    vi.useFakeTimers();
+    const harness = socketHarness();
+    const socket = openSocket(harness, { reconnectBaseMs: 1000 });
     harness.sockets[0]?.serverClose();
 
     expect(socket.isConnected).toBe(false);

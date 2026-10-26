@@ -76,6 +76,46 @@ describe('clob client', () => {
     expect(fetchImpl.calls).toHaveLength(2);
   });
 
+  it('retries HTTP 429 and then succeeds', async () => {
+    const fetchImpl = sequenceFetch([
+      jsonResponse({ error: 'rate limited' }, 429),
+      jsonResponse({ error: 'rate limited' }, 429),
+      jsonResponse(makeClobBook()),
+    ]);
+    const client = new ClobClient({ fetchImpl, maxRetries: 2, retryBaseMs: 50 });
+    const book = await client.getBook('yes-token');
+    expect(book.assetId).toBe('yes-token');
+    expect(fetchImpl.calls).toHaveLength(3);
+  });
+
+  it('exhausts the retry budget on repeated 429 and 5xx responses', async () => {
+    const rateLimited = sequenceFetch([jsonResponse({ error: 'busy' }, 429)]);
+    const limitedClient = new ClobClient({
+      fetchImpl: rateLimited,
+      maxRetries: 2,
+      retryBaseMs: 50,
+    });
+    await expect(limitedClient.getBook('yes-token')).rejects.toMatchObject({
+      code: 'clob_http_error',
+      status: 429,
+      retryable: true,
+    });
+    expect(rateLimited.calls).toHaveLength(3);
+
+    const unavailable = sequenceFetch([jsonResponse({ error: 'down' }, 503)]);
+    const unavailableClient = new ClobClient({
+      fetchImpl: unavailable,
+      maxRetries: 1,
+      retryBaseMs: 50,
+    });
+    await expect(unavailableClient.getBook('yes-token')).rejects.toMatchObject({
+      code: 'clob_http_error',
+      status: 503,
+      retryable: true,
+    });
+    expect(unavailable.calls).toHaveLength(2);
+  });
+
   it('does not retry a non-retryable failure', async () => {
     const fetchImpl = sequenceFetch([jsonResponse({ error: 'missing' }, 404)]);
     const client = new ClobClient({ fetchImpl, maxRetries: 3, retryBaseMs: 1 });
