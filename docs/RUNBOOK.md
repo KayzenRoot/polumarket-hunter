@@ -15,6 +15,9 @@ npm run dev
 
 The API autostarts the paper engine unless `POLYHUNTER_AUTOSTART=false`.
 
+Run `npm run doctor` first when something looks wrong; see [docs/DOCTOR.md](DOCTOR.md) for the
+check list and remediation.
+
 ## Offline demo
 
 ```bash

@@ -37,6 +37,7 @@
     "research": "tsx --tsconfig tsconfig.dev.json scripts/research.ts",
     "backtest": "tsx --tsconfig tsconfig.dev.json scripts/backtest.ts",
     "demo": "tsx --tsconfig tsconfig.dev.json scripts/demo.ts",
+    "doctor": "tsx --tsconfig tsconfig.dev.json scripts/doctor.ts",
     "ecc:sync": "node scripts/sync-ecc.mjs"
   },
   "devDependencies": {

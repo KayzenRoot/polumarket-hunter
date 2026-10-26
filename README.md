@@ -141,6 +141,7 @@ Risk controls are fail-closed. See [docs/STRATEGY.md](docs/STRATEGY.md) and
 | `npm run research -- --file <file>`      | Train/validation report with baselines          |
 | `npm run backtest -- --file <recording>` | Replay a recording through the strategy         |
 | `npm run demo`                           | Deterministic synthetic backtest                |
+| `npm run doctor`                         | Runtime, config, DB, provider and clock checks  |
 | `npm run ecc:sync`                       | Refresh curated ECC skills/rules                |
 
 ## Recording and replay
