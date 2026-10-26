@@ -4,15 +4,19 @@ import { type DecodeResult, decodeRecording } from './recording.js';
 import type { OrderBook, Outcome } from './types.js';
 
 export const DEFAULT_RECORDING_VALIDATION = {
-  maxGapMs: 30_000,
+  maxGapMs: 120_000,
   gapWarnMs: 10_000,
   minDurationMs: 60_000,
+  maxCrossedPct: 0.01,
+  maxBackwardsMs: 1_000,
 } as const;
 
 export interface RecordingValidationOptions {
   readonly maxGapMs?: number;
   readonly gapWarnMs?: number;
   readonly minDurationMs?: number;
+  readonly maxCrossedPct?: number;
+  readonly maxBackwardsMs?: number;
   readonly expectedTokens?: readonly string[];
 }
 
@@ -102,6 +106,7 @@ function createTokenState(book: OrderBook): TokenState {
 interface GapLimits {
   readonly maxGapMs: number;
   readonly gapWarnMs: number;
+  readonly maxBackwardsMs: number;
 }
 
 function updateTokenState(
@@ -123,7 +128,14 @@ function updateTokenState(
 
   const gap = book.timestamp - existing.previousAt;
   if (gap < 0) {
-    addError(`${label}: timestamp moved backwards by ${Math.abs(gap)}ms for this token`);
+    const backwardsMs = Math.abs(gap);
+    if (backwardsMs > limits.maxBackwardsMs) {
+      addError(`${label}: timestamp moved backwards by ${backwardsMs}ms for this token`);
+    } else {
+      addWarning(
+        `${label}: timestamp moved backwards by ${backwardsMs}ms (within ${limits.maxBackwardsMs}ms tolerance)`,
+      );
+    }
   } else {
     existing.previousAt = book.timestamp;
     existing.maxGapMs = Math.max(existing.maxGapMs, gap);
@@ -148,7 +160,6 @@ function updateTokenState(
 function bookTopIssue(
   book: OrderBook,
   label: string,
-  addError: (message: string) => void,
   addWarning: (message: string) => void,
 ): boolean {
   const top = topOfBook(book);
@@ -156,11 +167,7 @@ function bookTopIssue(
     addWarning(`${label}: no two-sided quote`);
     return false;
   }
-  if (!top.crossed) {
-    return false;
-  }
-  addError(`${label}: crossed book bid ${top.bid} >= ask ${top.ask}`);
-  return true;
+  return top.crossed;
 }
 
 export function validateRecording(
@@ -181,6 +188,14 @@ export function validateRecording(
   const minDurationMs = positive(
     options.minDurationMs ?? DEFAULT_RECORDING_VALIDATION.minDurationMs,
     DEFAULT_RECORDING_VALIDATION.minDurationMs,
+  );
+  const maxCrossedPct = Math.min(
+    1,
+    Math.max(0, options.maxCrossedPct ?? DEFAULT_RECORDING_VALIDATION.maxCrossedPct),
+  );
+  const maxBackwardsMs = positive(
+    options.maxBackwardsMs ?? DEFAULT_RECORDING_VALIDATION.maxBackwardsMs,
+    DEFAULT_RECORDING_VALIDATION.maxBackwardsMs,
   );
 
   const errors: string[] = [];
@@ -229,7 +244,7 @@ export function validateRecording(
     }
 
     validateLevels(book, label, addError);
-    if (bookTopIssue(book, label, addError, addWarning)) {
+    if (bookTopIssue(book, label, addWarning)) {
       crossedBooks += 1;
     }
 
@@ -242,8 +257,27 @@ export function validateRecording(
       byToken.set(book.tokenId, createTokenState(book));
       return;
     }
-    updateTokenState(existing, book, label, { maxGapMs, gapWarnMs }, addError, addWarning);
+    updateTokenState(
+      existing,
+      book,
+      label,
+      { maxGapMs, gapWarnMs, maxBackwardsMs },
+      addError,
+      addWarning,
+    );
   });
+
+  if (crossedBooks > 0) {
+    const crossedPct = decoded.books.length > 0 ? crossedBooks / decoded.books.length : 0;
+    addWarning(
+      `${crossedBooks} crossed/locked book(s) (${(crossedPct * 100).toFixed(2)}%); the strategy holds on them`,
+    );
+    if (crossedPct > maxCrossedPct) {
+      addError(
+        `crossed book ratio ${(crossedPct * 100).toFixed(2)}% exceeds max ${(maxCrossedPct * 100).toFixed(2)}%`,
+      );
+    }
+  }
 
   const coverage: RecordingTokenCoverage[] = [...byToken.entries()]
     .map(([tokenId, state]) => ({

@@ -15,6 +15,8 @@ const { values } = parseArgs({
     'max-gap-ms': { type: 'string' },
     'gap-warn-ms': { type: 'string' },
     'min-duration-ms': { type: 'string' },
+    'max-crossed-pct': { type: 'string' },
+    'max-backwards-ms': { type: 'string' },
     'expected-token': { type: 'string', multiple: true },
   },
 });
@@ -42,6 +44,14 @@ const report = validateRecordingText(text, {
   minDurationMs: numberOption(
     values['min-duration-ms'],
     DEFAULT_RECORDING_VALIDATION.minDurationMs,
+  ),
+  maxCrossedPct: numberOption(
+    values['max-crossed-pct'],
+    DEFAULT_RECORDING_VALIDATION.maxCrossedPct,
+  ),
+  maxBackwardsMs: numberOption(
+    values['max-backwards-ms'],
+    DEFAULT_RECORDING_VALIDATION.maxBackwardsMs,
   ),
   ...(values['expected-token'] === undefined ? {} : { expectedTokens: values['expected-token'] }),
 });

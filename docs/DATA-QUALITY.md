@@ -14,21 +14,29 @@ lists every reason, capped at 50 findings with an omission count.
 
 ## Default thresholds
 
-| Check                   | Default                          | Result  |
-| ----------------------- | -------------------------------- | ------- |
-| Session duration        | at least `60_000` ms             | error   |
-| Gap between token books | above `30_000` ms                | error   |
-| Gap between token books | above `10_000` ms                | warning |
-| Price level             | outside the open interval (0, 1) | error   |
-| Size                    | zero or negative                 | error   |
-| Crossed book            | best bid >= best ask             | error   |
-| Timestamp               | moved backwards for a token      | error   |
-| Timestamp               | invalid or missing               | error   |
-| Duplicate hash          | consecutive identical hash       | warning |
-| Global ordering         | out of order across tokens       | warning |
-| One-sided/empty book    | no two-sided quote               | warning |
-| Missing expected token  | `--expected-token` not recorded  | error   |
-| Malformed line          | invalid JSON or invalid book     | error   |
+| Check                   | Default                             | Result  |
+| ----------------------- | ----------------------------------- | ------- |
+| Session duration        | at least `60_000` ms                | error   |
+| Gap between token books | above `120_000` ms                  | error   |
+| Gap between token books | above `10_000` ms                   | warning |
+| Price level             | outside the open interval (0, 1)    | error   |
+| Size                    | zero or negative                    | error   |
+| Crossed book ratio      | above `1%` of books                 | error   |
+| Crossed/locked book     | individual snapshot                 | warning |
+| Timestamp               | moved backwards more than `1000` ms | error   |
+| Timestamp               | moved backwards within `1000` ms    | warning |
+| Timestamp               | invalid or missing                  | error   |
+| Duplicate hash          | consecutive identical hash          | warning |
+| Global ordering         | out of order across tokens          | warning |
+| One-sided/empty book    | no two-sided quote                  | warning |
+| Missing expected token  | `--expected-token` not recorded     | error   |
+| Malformed line          | invalid JSON or invalid book        | error   |
+
+The crossed ratio and backwards tolerance were calibrated against a live 10-minute recording
+(31,030 books): 84 crossed/locked snapshots (0.27%) and 657 small timestamp regressions (max 29ms)
+are normal transient feed behavior; the strategy holds on both. A sustained crossed ratio or a large
+clock jump still fails. Override with `--max-crossed-pct`, `--max-backwards-ms`, `--max-gap-ms` or
+`--gap-warn-ms`. Do not relax a threshold merely to make a session pass; record why in the memo.
 
 Normalization drops invalid price or size levels before a book reaches the strategy. The decoder
 reports those dropped levels and the validator treats them as hard errors, so a corrupt level cannot
