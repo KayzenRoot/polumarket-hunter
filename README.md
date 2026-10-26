@@ -152,6 +152,9 @@ Risk controls are fail-closed. See [docs/STRATEGY.md](docs/STRATEGY.md) and
 | `docker compose up --build`              | Reproducible container runtime (needs token)    |
 | `npm run ecc:sync`                       | Refresh curated ECC skills/rules                |
 
+Release tags are built by `.github/workflows/release.yml` with an SBOM and checksums; see
+[docs/RELEASE.md](docs/RELEASE.md).
+
 ## Recording and replay
 
 ```bash

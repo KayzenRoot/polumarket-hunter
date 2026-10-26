@@ -7,6 +7,8 @@
 | `ci.yml` → `quality`              | Biome lint/format, strict typecheck, unit/integration/property tests, coverage gate, production build |
 | `ci.yml` → `windows-quality`      | Clean `npm ci`, lint, typecheck, coverage and build on Windows 24                                     |
 | `ci.yml` → `e2e`                  | Playwright dashboard, navigation, kill switch and reset flow                                          |
+| `ci.yml` → `docker`               | Builds the image and probes a running API                                                             |
+| `release.yml`                     | Tag-driven artifact, CycloneDX SBOM and SHA256 checksums                                              |
 | `codeql.yml` → `codeql`           | GitHub CodeQL security-extended analysis for JavaScript/TypeScript                                    |
 | `security.yml` → `secret-scan`    | Gitleaks full-history secret scan                                                                     |
 | `security.yml` → `semgrep`        | Semgrep `p/ci` at ERROR severity; SARIF uploaded                                                      |
@@ -29,6 +31,7 @@ The `main` ruleset should require:
 - `quality`
 - `windows-quality`
 - `e2e`
+- `docker`
 - `codeql`
 - `security-gate`
 
