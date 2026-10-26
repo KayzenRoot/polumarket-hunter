@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1
-FROM node:24-bookworm-slim AS build
+# node:24-bookworm-slim, pinned by digest for reproducible builds.
+FROM node@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -18,7 +19,8 @@ COPY apps ./apps
 RUN npm run build
 RUN npm prune --omit=dev --no-audit --no-fund
 
-FROM node:24-bookworm-slim AS runtime
+# node:24-bookworm-slim, pinned by digest for reproducible builds.
+FROM node@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS runtime
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=8787 \

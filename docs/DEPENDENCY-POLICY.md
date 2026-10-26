@@ -72,9 +72,20 @@ Review the lockfile diff and the Socket/Dependency Review result before merging.
 
 ## Python and Docker dependencies
 
-Semgrep is installed from a hash-pinned requirements file. Regenerate it with `pip-compile
---generate-hashes` in the same Python minor version as CI (3.12), then run the security workflow.
-Docker base images are pinned by digest; update the digest deliberately and rebuild the image.
+Semgrep is installed from `requirements/security.txt` with `pip install --require-hashes`. Update
+`requirements/security.in`, then regenerate on Python 3.12:
+
+```bash
+uv pip compile --python 3.12 --generate-hashes \
+  requirements/security.in -o requirements/security.txt
+python -m pip install --require-hashes -r requirements/security.txt
+```
+
+`pip-compile --generate-hashes` is an acceptable equivalent. Do not install Semgrep with an
+unhashed `pip install semgrep==...` in CI.
+
+Docker base images are pinned by digest in the `Dockerfile`; update the digest deliberately and
+rebuild the image. The Docker CI job is the verification.
 
 ## GitHub Actions
 
