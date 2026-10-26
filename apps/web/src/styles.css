@@ -364,6 +364,34 @@ button:disabled {
   border-color: #2a3d4d;
 }
 
+.select-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--faint);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.select {
+  min-height: 32px;
+  padding: 0 28px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: none;
+}
+
+.select:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
 .pill {
   display: inline-flex;
   align-items: center;

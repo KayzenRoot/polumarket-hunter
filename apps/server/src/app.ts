@@ -33,6 +33,7 @@ const tokenParamsSchema = z.object({
 
 const limitQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).optional().default(100),
+  session: z.string().min(1).max(128).optional(),
 });
 
 function ok<T>(data: T): { ok: true; data: T } {
@@ -108,6 +109,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   app.get('/api/health', async () => ok(engine.health()));
   app.get('/api/state', async () => ok(engine.state()));
+  app.get('/api/sessions', async () => ok(engine.sessions(50)));
   app.get('/api/markets', async () => ok(engine.state().markets));
   app.get('/api/portfolio', async () => ok(engine.portfolio()));
   app.get('/api/risk', async () => ok(engine.risk()));
@@ -127,17 +129,17 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   app.get('/api/trades', async (request, reply) => {
     const parsed = limitQuerySchema.safeParse(request.query);
     if (!parsed.success) {
-      return reply.code(400).send(fail('invalid_query', 'limit must be between 1 and 500'));
+      return reply.code(400).send(fail('invalid_query', 'invalid limit or session filter'));
     }
-    return ok(engine.trades(parsed.data.limit));
+    return ok(engine.trades(parsed.data.limit, parsed.data.session));
   });
 
   app.get('/api/signals', async (request, reply) => {
     const parsed = limitQuerySchema.safeParse(request.query);
     if (!parsed.success) {
-      return reply.code(400).send(fail('invalid_query', 'limit must be between 1 and 500'));
+      return reply.code(400).send(fail('invalid_query', 'invalid limit or session filter'));
     }
-    return ok(engine.signals(parsed.data.limit));
+    return ok(engine.signals(parsed.data.limit, parsed.data.session));
   });
 
   app.post(

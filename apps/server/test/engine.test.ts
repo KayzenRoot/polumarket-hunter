@@ -129,6 +129,14 @@ describe('paper engine', () => {
     expect(state.portfolio.equity).toBe(1000);
     expect(state.equityCurve.length).toBeGreaterThanOrEqual(1);
     expect(state.config.demoMode).toBe(true);
+    expect(state.session).toMatchObject({
+      status: 'running',
+      mode: 'paper',
+      startingCash: 1000,
+      endedAt: null,
+      stopReason: null,
+    });
+    expect(state.sessions.map((session) => session.id)).toContain(state.session?.id);
   });
 
   it('places a resting bid, fills it and persists the trade', async () => {
@@ -181,6 +189,106 @@ describe('paper engine', () => {
 
     engine.stop();
     expect(engine.health().status).toBe('stopped');
+  });
+
+  it('records a session on start and closes it on stop', async () => {
+    const { engine, db, clock } = harness();
+    await engine.start();
+    const started = engine.state().session;
+    expect(started).not.toBeNull();
+    if (started === null) {
+      throw new Error('expected a running session');
+    }
+    expect(db.getRun(started.id)).toMatchObject({
+      id: started.id,
+      status: 'running',
+      mode: 'paper',
+      startedAt: clock.now(),
+      endedAt: null,
+    });
+
+    clock.advance(5_000);
+    engine.stop();
+    const stopped = engine.state().session;
+    expect(stopped).not.toBeNull();
+    if (stopped === null) {
+      throw new Error('expected a stopped session');
+    }
+    expect(stopped).toMatchObject({
+      id: started.id,
+      status: 'stopped',
+      stopReason: 'engine stopped',
+      endedAt: clock.now(),
+      endingEquity: 1000,
+    });
+    expect(db.getRun(started.id)).toEqual(stopped);
+  });
+
+  it('marks the session killed and restores it on reset', async () => {
+    const { engine, db, clock } = harness();
+    await engine.start();
+    const session = engine.state().session;
+    expect(session).not.toBeNull();
+    if (session === null) {
+      throw new Error('expected a running session');
+    }
+
+    clock.advance(2_000);
+    engine.kill('operator test');
+    expect(engine.state().session).toMatchObject({
+      id: session.id,
+      status: 'killed',
+      stopReason: 'operator test',
+      endedAt: clock.now(),
+      endingEquity: 1000,
+    });
+    expect(db.getRun(session.id)).toMatchObject({ status: 'killed', endedAt: clock.now() });
+
+    await engine.control('reset-kill');
+    expect(engine.state().session).toMatchObject({
+      id: session.id,
+      status: 'running',
+      stopReason: null,
+      endedAt: null,
+      endingEquity: null,
+    });
+    expect(db.getRun(session.id)).toMatchObject({ status: 'running', endedAt: null });
+  });
+
+  it('keeps ledgers separate when the engine restarts', async () => {
+    const { engine, db, clock } = harness();
+    await engine.start();
+    const first = engine.state().session;
+    expect(first).not.toBeNull();
+    if (first === null) {
+      throw new Error('expected a running session');
+    }
+
+    engine.ingestBook(quoteBook(clock.now()));
+    clock.advance(1000);
+    engine.ingestBook(crossingBook(clock.now()));
+    expect(engine.trades(100, first.id)).toHaveLength(1);
+    expect(engine.state().trades).toHaveLength(1);
+
+    engine.stop();
+    await engine.start();
+    const second = engine.state().session;
+    expect(second).not.toBeNull();
+    if (second === null) {
+      throw new Error('expected a new session');
+    }
+    expect(second.id).not.toBe(first.id);
+    expect(engine.trades(100, first.id)).toHaveLength(1);
+    expect(engine.trades(100, second.id)).toHaveLength(0);
+    expect(engine.signals(100, second.id)).toHaveLength(0);
+    expect(engine.state().trades).toHaveLength(0);
+    expect(
+      engine
+        .state()
+        .sessions.map((item) => item.id)
+        .sort(),
+    ).toEqual([first.id, second.id].sort());
+    expect(db.listRuns()).toHaveLength(2);
   });
 
   it('notifies state subscribers', async () => {
@@ -353,6 +461,9 @@ describe('paper engine', () => {
     engines.push(engine);
     await expect(engine.start()).rejects.toThrow(/no eligible Polymarket markets/);
     expect(engine.health().status).toBe('error');
+    const failed = db.listRuns()[0];
+    expect(failed).toMatchObject({ status: 'error', endingEquity: 1000 });
+    expect(failed?.stopReason).toMatch(/no eligible Polymarket markets/);
   });
 
   it('exposes market detail and tolerates idempotent control calls', async () => {

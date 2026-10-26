@@ -75,10 +75,25 @@ Native `node:sqlite`; no native addon compilation. Tables:
 - `signals` — every actionable decision, accepted or blocked, with reasons.
 - `trades` — every paper fill and settlement.
 - `portfolio_snapshots` — periodic equity/exposure time series for the chart.
+- `runs` — one row per paper session: start/end, status, starting cash, ending equity, stop reason.
 - `events` — engine lifecycle, risk events, provider resolution.
 
-The database is an **audit log**, not the strategy state. A process restart starts a clean paper
-session; historical rows remain queryable.
+Signals, trades and portfolio snapshots carry a `session_id`; rows written before the migration
+default to `legacy`. The database is an **audit log**, not the strategy state.
+
+### Paper session semantics
+
+- Starting the engine opens a new `runs` row and a fresh paper broker seeded with `STARTING_CASH`.
+  Decisions, entry cooldowns and the risk controller are reset, so a restart never carries a
+  position or a ledger into the new run.
+- Stopping the engine or a failed autostart closes the run with an end time, ending equity and a
+  reason.
+- The kill switch marks the active run `killed` and timestamps the close. Resetting the kill switch
+  reopens the same run rather than silently creating a new one.
+- `GET /api/state` returns the current run, the last 20 runs and only the current run's ledger.
+  `/api/sessions` lists runs newest first; `/api/trades` and `/api/signals` accept an optional
+  `session=<id>` filter. Omitting the filter on those two endpoints returns all sessions from the
+  SQLite audit log.
 
 ### `apps/server`
 

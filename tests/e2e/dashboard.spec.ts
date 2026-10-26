@@ -23,6 +23,8 @@ test.describe('PolyHunter dashboard', () => {
 
     await page.getByRole('button', { name: 'Trades' }).click();
     await expect(page.getByRole('heading', { name: 'Fills and realized PnL' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Filter trades by session' })).toBeVisible();
+    await expect(page.getByText(/^session ses_/)).toBeVisible();
 
     await page.getByRole('button', { name: 'Risk' }).click();
     await expect(page.getByRole('heading', { name: 'Risk and compliance' })).toBeVisible();
