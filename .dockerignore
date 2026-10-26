@@ -1,0 +1,15 @@
+.git
+.github
+node_modules
+**/node_modules
+apps/*/dist
+packages/*/dist
+coverage
+test-results
+playwright-report
+data
+docs/dashboard.png
+*.log
+.env
+.env.*
+!.env.example

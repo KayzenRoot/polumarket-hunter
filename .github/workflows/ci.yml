@@ -108,6 +108,46 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  docker:
+    name: docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build image
+        run: docker build --pull -t polyhunter:ci .
+
+      - name: Run container and probe health
+        run: |
+          set -euo pipefail
+          trap 'docker rm -f polyhunter-ci >/dev/null 2>&1 || true' EXIT
+          docker run -d --name polyhunter-ci -p 8788:8787 \
+            -e HOST=0.0.0.0 \
+            -e PORT=8787 \
+            -e DEMO_MODE=true \
+            -e TRADING_MODE=paper \
+            -e API_TOKEN=ci-token \
+            -e DATABASE_PATH=/tmp/polyhunter.db \
+            -e RECORD_DIR=/tmp/recordings \
+            polyhunter:ci
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8788/api/health > /tmp/polyhunter-health.json &&
+              node -e "const r=require('/tmp/polyhunter-health.json'); process.exit(r.ok && r.data.status === 'running' ? 0 : 1)"; then
+              break
+            fi
+            sleep 2
+          done
+          docker logs polyhunter-ci
+          node -e "const r=require('/tmp/polyhunter-health.json'); if (!r.ok || r.data.status !== 'running') { console.error(r); process.exit(1); }"
+          curl -fsS http://127.0.0.1:8788/api/state -o /tmp/polyhunter-state.json
+          node -e "const r=require('/tmp/polyhunter-state.json'); if (!r.ok || r.data.markets.length === 0) { console.error(r); process.exit(1); }"
+
   e2e:
     name: e2e
     runs-on: ubuntu-latest

@@ -133,7 +133,8 @@ Session reports are rebuilt from SQLite; use the **Reports** dashboard view or
 [docs/SESSION-REPORT.md](SESSION-REPORT.md).
 
 Retention, backup, restore and disk/corruption recovery are in
-[docs/DATA-RETENTION.md](DATA-RETENTION.md).
+[docs/DATA-RETENTION.md](DATA-RETENTION.md). The container runtime is documented in
+[docs/DOCKER.md](DOCKER.md).
 
 ## Backtesting a recording
 
