@@ -89,7 +89,9 @@ Live execution is not part of v0.1.0. The geoblock currently reports `BLOCKED` f
 VPN/proxy bypass and no signing code in the repository.
 
 The HTTP contract is documented in [docs/API.md](docs/API.md) and
-[docs/openapi.json](docs/openapi.json); the running server exposes it at `/openapi.json`.
+[docs/openapi.json](docs/openapi.json); the running server exposes it at `/openapi.json`. For
+systemd/Task Scheduler autostart, restart and log rotation, see
+[docs/SUPERVISOR.md](docs/SUPERVISOR.md).
 
 ## Architecture
 

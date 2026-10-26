@@ -1,0 +1,35 @@
+[Unit]
+Description=PolyHunter paper-first prediction market terminal
+Documentation=file:/opt/polyhunter/docs/SUPERVISOR.md
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=polyhunter
+Group=polyhunter
+WorkingDirectory=/opt/polyhunter
+EnvironmentFile=-/opt/polyhunter/.env
+ExecStart=/usr/bin/node apps/server/dist/main.js
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+StateDirectory=polyhunter
+LogsDirectory=polyhunter
+StandardOutput=append:/var/log/polyhunter/polyhunter.log
+StandardError=append:/var/log/polyhunter/polyhunter.err.log
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target
