@@ -16,6 +16,7 @@ import Fastify, {
 import type { Logger } from 'pino';
 import { z } from 'zod';
 import type { AppConfig } from './config.js';
+import { OPENAPI_DOCUMENT, OPENAPI_PATH } from './openapi.js';
 import type { EnginePort } from './ports.js';
 
 export interface BuildAppOptions {
@@ -121,6 +122,13 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     }
     return payload;
   });
+
+  app.get(OPENAPI_PATH, (_request, reply) =>
+    reply
+      .header('cache-control', 'public, max-age=300')
+      .type('application/json; charset=utf-8')
+      .send(OPENAPI_DOCUMENT),
+  );
 
   app.get('/api/health', async () => ok(engine.health()));
   app.get('/api/state', async () => ok(engine.state()));
