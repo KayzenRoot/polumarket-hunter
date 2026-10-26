@@ -88,6 +88,9 @@ in the [production plan](docs/PRODUCTION-PLAN.md). The release is on the
 Live execution is not part of v0.1.0. The geoblock currently reports `BLOCKED` for BR; there is no
 VPN/proxy bypass and no signing code in the repository.
 
+The HTTP contract is documented in [docs/API.md](docs/API.md) and
+[docs/openapi.json](docs/openapi.json); the running server exposes it at `/openapi.json`.
+
 ## Architecture
 
 ```text

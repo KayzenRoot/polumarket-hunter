@@ -21,7 +21,8 @@
       "!**/.ecc",
       "!**/playwright-report",
       "!**/test-results",
-      "!**/data"
+      "!**/data",
+      "!docs/openapi.json"
     ]
   },
   "formatter": {

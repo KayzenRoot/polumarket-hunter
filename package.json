@@ -43,6 +43,7 @@
     "db:prune": "tsx --tsconfig tsconfig.dev.json scripts/db-prune.ts",
     "data:export": "tsx --tsconfig tsconfig.dev.json scripts/data-export.ts",
     "audit:gate": "tsx --tsconfig tsconfig.dev.json scripts/audit-gate.ts",
+    "api:spec": "tsx --tsconfig tsconfig.dev.json scripts/openapi.ts",
     "ecc:sync": "node scripts/sync-ecc.mjs"
   },
   "devDependencies": {
