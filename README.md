@@ -145,8 +145,9 @@ The recorder writes one normalized book per line. The backtest uses the same `Pa
 - GitHub Actions: CodeQL, Semgrep, Gitleaks, OSV-Scanner, dependency review, actionlint, zizmor,
   OpenSSF Scorecard, harden-runner.
 - Dependabot for npm and GitHub Actions.
-- Ruleset intent: protected `main`, required `quality`, `e2e`, `codeql` and `security` checks,
-  linear history, no force push, no deletion, owner bypass for emergencies.
+- Ruleset intent: protected `main`, required `quality`, `e2e`, `codeql` and `security-gate` checks,
+  linear history, no force push, no deletion, no admin bypass.
+- Report vulnerabilities privately via [SECURITY.md](SECURITY.md); do not open a public issue.
 
 See [docs/CI-AND-APPS.md](docs/CI-AND-APPS.md) for the free tool stack and one-click GitHub App
 links. GitHub App installation requires the repository owner's GitHub session; the repository
