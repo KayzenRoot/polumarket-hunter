@@ -138,7 +138,7 @@ not confuse it with the production artifact.
 | -------------- | ------------------------------------------------------ | --------------------------------- |
 | G0 Contract    | Contract approved by owner                             | #15 — closed 2026-10-26           |
 | G1 Correctness | Tick/session/fault tests green; CI green               | #16, #17, #19 — closed 2026-10-26 |
-| G2 Evidence    | 3 validated sessions, baselines, decision memo         | #27, #28, #29, #30                |
+| G2 Evidence    | 3 validated sessions, baselines, decision memo         | #27, #28, #30 closed; #29 open    |
 | G3 Operations  | Doctor, retention/backup, report, control audit        | #18, #20–#26                      |
 | G4 Release     | Windows CI, Docker, SBOM/checksums, clean runbook      | #31–#35                           |
 | G5 Sign-off    | Owner approval; release naming decision; no open P0/P1 | all P0/P1                         |
@@ -191,16 +191,20 @@ Do not compress the evidence gate to hit a date.
 
 As of 2026-10-26:
 
-- v0.1.0 production: **21 open**, 4 closed (#15, #16, #17, #19).
+- v0.1.0 production: **18 open**, 7 closed (#15, #16, #17, #19, #27, #28, #30).
 - v0.1.x hardening: **6 open**.
 - v0.2.0 live readiness: **6 open, blocked**.
-- Current gate: **G2 — evidence**.
+- Current gate: **G2 — evidence**. Tooling is complete; #29 needs owner time and approval.
 
 ## 11. Next action
 
-1. Run #27 (recording validator) and #28 (research harness) in parallel, then #30 (fee assumptions).
-2. Use #27 fixtures to harden schema and freshness checks before recording real sessions.
-3. After #27, #28 and #30 are merged, run #29: three validated sessions and the decision memo.
-4. Do not tune the strategy before the #29 evidence is recorded.
+1. Record three independent sessions at different times/regimes, validate each one, and run the
+   research harness with an explicit fee assumption.
+2. Publish `docs/research/v0.1-evidence.md` with train/validation metrics, both baselines, fees,
+   drawdown and fill rate.
+3. Ask the owner to approve or reject the go/no-go recommendation; do not fabricate a session or
+   tune on validation.
+4. Wave 3 operations work (#18, #20–#26) can proceed in parallel, but G2 stays open until #29 has
+   three validated recordings and an approved memo.
 
 The first production PR should be small and boring. That is the point.
