@@ -1,0 +1,31 @@
+{
+  "source": "https://github.com/affaan-m/ECC",
+  "package": "ecc-universal",
+  "version": "2.2.3",
+  "license": "MIT",
+  "skills": [
+    "tdd-workflow",
+    "verification-loop",
+    "security-review",
+    "coding-standards",
+    "production-audit",
+    "latency-critical-systems",
+    "prediction-market-risk-review",
+    "prediction-market-oracle-research",
+    "api-design",
+    "backend-patterns",
+    "frontend-patterns",
+    "e2e-testing",
+    "error-handling",
+    "benchmark-optimization-loop",
+    "github-ops",
+    "context-budget",
+    "strategic-compact"
+  ],
+  "rules": [
+    "common",
+    "typescript",
+    "web",
+    "react"
+  ]
+}

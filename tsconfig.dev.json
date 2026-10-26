@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "incremental": false,
+    "noEmit": true,
+    "paths": {
+      "@polyhunter/core": ["./packages/core/src/index.ts"],
+      "@polyhunter/polymarket": ["./packages/polymarket/src/index.ts"],
+      "@polyhunter/persistence": ["./packages/persistence/src/index.ts"],
+      "@polyhunter/testkit": ["./packages/testkit/src/index.ts"]
+    }
+  },
+  "include": ["apps/server/src/**/*.ts", "scripts/**/*.ts"]
+}

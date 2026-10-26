@@ -1,0 +1,64 @@
+{
+  "name": "polyhunter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Paper-first Polymarket micro-scalper with real public market data, risk controls, replay and a live trading gate.",
+  "license": "MIT",
+  "packageManager": "npm@11.17.0",
+  "engines": {
+    "node": ">=24 <27"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,web -c cyan,magenta \"npm run dev:server\" \"npm run dev:web\"",
+    "dev:server": "tsx watch --tsconfig tsconfig.dev.json apps/server/src/main.ts",
+    "dev:web": "vite --config apps/web/vite.config.ts",
+    "build": "tsc -b && npm run build:web",
+    "build:web": "vite build --config apps/web/vite.config.ts",
+    "start": "node apps/server/dist/main.js",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "typecheck": "tsc -b --pretty false && tsc -p tsconfig.test.json --pretty false && tsc -p apps/web/tsconfig.json --pretty false",
+    "typecheck:web": "tsc -p apps/web/tsconfig.json --pretty false",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "verify": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "ci": "npm run lint && npm run typecheck && npm run test:coverage && npm run build",
+    "smoke": "tsx --tsconfig tsconfig.dev.json scripts/smoke.ts",
+    "record": "tsx --tsconfig tsconfig.dev.json scripts/record.ts",
+    "backtest": "tsx --tsconfig tsconfig.dev.json scripts/backtest.ts",
+    "demo": "tsx --tsconfig tsconfig.dev.json scripts/demo.ts",
+    "ecc:sync": "node scripts/sync-ecc.mjs"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3",
+    "@playwright/test": "1.64.1",
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "@vitest/coverage-v8": "5.0.5",
+    "concurrently": "10.0.6",
+    "ecc-universal": "2.2.3",
+    "fast-check": "4.10.2",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  },
+  "overrides": {
+    "esbuild": "0.28.2",
+    "vite": "$vite",
+    "vitest": "$vitest"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}

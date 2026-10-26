@@ -1,0 +1,22 @@
+{
+  "name": "@polyhunter/polymarket",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Public Polymarket Gamma, CLOB and market WebSocket adapters with a fail-closed geoblock gate.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@polyhunter/core": "0.1.0",
+    "zod": "4.6.7"
+  }
+}

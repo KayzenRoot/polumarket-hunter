@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a reproducible defect in PolyHunter.
+title: '[bug] '
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include private keys, seed phrases, API secrets, cookies or account data.
+        This project is paper-only; never attach a live trading credential.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Exact commands, market/token ids, and observed output.
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit or version
+      placeholder: git rev-parse HEAD
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - core strategy / risk / broker
+        - Polymarket provider / stream
+        - persistence
+        - API
+        - dashboard
+        - CI / tooling
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      description: Remove secrets, tokens and account identifiers.
+      render: shell

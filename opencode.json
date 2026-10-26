@@ -1,0 +1,8 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md", ".ecc/instructions/OPERATING-LOOP.md"],
+  "plugin": ["ecc-universal"],
+  "skills": {
+    "paths": [".ecc/skills"]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@polyhunter/persistence",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "SQLite persistence for signals, trades, portfolio snapshots and risk events.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@polyhunter/core": "0.1.0"
+  }
+}

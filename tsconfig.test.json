@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "incremental": false,
+    "noEmit": true,
+    "paths": {
+      "@polyhunter/core": ["./packages/core/src/index.ts"],
+      "@polyhunter/polymarket": ["./packages/polymarket/src/index.ts"],
+      "@polyhunter/persistence": ["./packages/persistence/src/index.ts"],
+      "@polyhunter/testkit": ["./packages/testkit/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/**/test/**/*.ts",
+    "apps/server/test/**/*.ts",
+    "apps/web/vite.config.ts",
+    "tests/**/*.ts",
+    "scripts/**/*.ts",
+    "vitest.config.ts",
+    "playwright.config.ts"
+  ]
+}

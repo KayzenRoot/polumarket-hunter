@@ -1,0 +1,548 @@
+import { PolyHunterDb } from '@polyhunter/persistence';
+import {
+  type GeoblockResult,
+  type MarketSocketOptions,
+  unknownGeoblock,
+} from '@polyhunter/polymarket';
+import { makeBook, makeClock } from '@polyhunter/testkit';
+import type { Logger } from 'pino';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { loadConfig } from '../src/config.js';
+import { PolyHunterEngine } from '../src/engine.js';
+import { createLogger } from '../src/logger.js';
+
+interface Harness {
+  readonly engine: PolyHunterEngine;
+  readonly db: PolyHunterDb;
+  readonly clock: ReturnType<typeof makeClock>;
+  readonly logger: Logger;
+}
+
+const engines: PolyHunterEngine[] = [];
+const databases: PolyHunterDb[] = [];
+
+function harness(overrides: Record<string, string> = {}): Harness {
+  const config = loadConfig({
+    NODE_ENV: 'test',
+    LOG_LEVEL: 'silent',
+    DEMO_MODE: 'true',
+    DATABASE_PATH: ':memory:',
+    STARTING_CASH: '1000',
+    MIN_EDGE: '0.001',
+    MIN_IMBALANCE: '0.1',
+    MAX_SPREAD: '0.05',
+    MIN_DEPTH_SHARES: '10',
+    ORDER_NOTIONAL: '10',
+    TAKE_PROFIT_EDGE: '0.05',
+    STOP_LOSS_EDGE: '0.2',
+    COOLDOWN_MS: '0',
+    ...overrides,
+  });
+  const db = PolyHunterDb.inMemory();
+  const logger = createLogger({ ...config, logLevel: 'silent' });
+  const clock = makeClock(1_000_000);
+  let counter = 0;
+  const engine = new PolyHunterEngine({
+    config,
+    db,
+    logger,
+    gamma: {
+      listMarkets: async () => {
+        throw new Error('gamma should not be called in demo mode');
+      },
+    },
+    clob: {
+      getBooks: async () => [],
+    },
+    geoblock: {
+      ensureFresh: async (): Promise<GeoblockResult> => unknownGeoblock(clock.now(), 'test'),
+      current: () => null,
+    },
+    now: clock.now,
+    idFactory: (prefix) => {
+      counter += 1;
+      return `${prefix}_test_${counter}`;
+    },
+  });
+  engines.push(engine);
+  databases.push(db);
+  return { engine, db, clock, logger };
+}
+
+function quoteBook(now: number) {
+  return makeBook({
+    tokenId: 'demo-yes-fed',
+    marketId: 'demo-fed',
+    outcome: 'YES',
+    timestamp: now,
+    bids: [
+      { price: 0.48, size: 300 },
+      { price: 0.47, size: 300 },
+    ],
+    asks: [
+      { price: 0.5, size: 100 },
+      { price: 0.51, size: 300 },
+    ],
+  });
+}
+
+function crossingBook(now: number) {
+  return makeBook({
+    tokenId: 'demo-yes-fed',
+    marketId: 'demo-fed',
+    outcome: 'YES',
+    timestamp: now,
+    bids: [
+      { price: 0.48, size: 300 },
+      { price: 0.47, size: 300 },
+    ],
+    asks: [
+      { price: 0.47, size: 100 },
+      { price: 0.48, size: 300 },
+    ],
+  });
+}
+
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  for (const engine of engines.splice(0)) {
+    engine.stop();
+  }
+  for (const db of databases.splice(0)) {
+    db.close();
+  }
+  vi.useRealTimers();
+});
+
+describe('paper engine', () => {
+  it('starts in demo mode and exposes a complete state', async () => {
+    const { engine } = harness();
+    await engine.start();
+    const state = engine.state();
+    expect(state.health.status).toBe('running');
+    expect(state.health.mode).toBe('paper');
+    expect(state.health.geoblock.status).toBe('UNKNOWN');
+    expect(state.markets).toHaveLength(3);
+    expect(state.portfolio.equity).toBe(1000);
+    expect(state.equityCurve.length).toBeGreaterThanOrEqual(1);
+    expect(state.config.demoMode).toBe(true);
+  });
+
+  it('places a resting bid, fills it and persists the trade', async () => {
+    const { engine, clock, db } = harness();
+    await engine.start();
+    engine.ingestBook(quoteBook(clock.now()));
+
+    let state = engine.state();
+    expect(state.portfolio.openOrders).toBe(1);
+    expect(db.listSignals()).toHaveLength(1);
+
+    clock.advance(1000);
+    engine.ingestBook(crossingBook(clock.now()));
+    state = engine.state();
+    expect(state.portfolio.reservedCash).toBe(0);
+    expect(state.portfolio.positions).toHaveLength(1);
+    expect(db.listTrades()).toHaveLength(1);
+    expect(state.trades).toHaveLength(1);
+  });
+
+  it('does not flood the signal log while a quote is resting', async () => {
+    const { engine, clock, db } = harness();
+    await engine.start();
+    engine.ingestBook(quoteBook(clock.now()));
+    engine.ingestBook(quoteBook(clock.now()));
+    expect(db.listSignals()).toHaveLength(1);
+  });
+
+  it('blocks a buy that breaches the per-market risk limit', async () => {
+    const { engine, clock, db } = harness({ MAX_NOTIONAL_PER_MARKET: '0.5' });
+    await engine.start();
+    engine.ingestBook(quoteBook(clock.now()));
+    const signals = db.listSignals();
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.accepted).toBe(false);
+    expect(signals[0]?.reasons.join(' ')).toContain('market-notional');
+    expect(engine.state().portfolio.openOrders).toBe(0);
+  });
+
+  it('stops, kills and resets the kill switch', async () => {
+    const { engine } = harness();
+    await engine.start();
+    engine.kill('operator test');
+    expect(engine.health().status).toBe('killed');
+    expect(engine.health().killReason).toBe('operator test');
+
+    await engine.control('reset-kill');
+    expect(engine.health().status).toBe('running');
+    expect(engine.state().risk.killSwitch).toBe(false);
+
+    engine.stop();
+    expect(engine.health().status).toBe('stopped');
+  });
+
+  it('notifies state subscribers', async () => {
+    const { engine } = harness();
+    const states: string[] = [];
+    const unsubscribe = engine.subscribe((state) => states.push(state.health.status));
+    await engine.start();
+    engine.kill('notify');
+    expect(states).toContain('running');
+    expect(states).toContain('killed');
+    unsubscribe();
+  });
+
+  it('emits Prometheus metrics', async () => {
+    const { engine } = harness();
+    await engine.start();
+    const metrics = engine.metrics();
+    expect(metrics).toContain('polyhunter_up 1');
+    expect(metrics).toContain('polyhunter_provider_connected 1');
+    expect(metrics).toContain('polyhunter_equity_usd');
+  });
+
+  it('refuses live mode even when authorized and eligible', async () => {
+    const config = loadConfig({
+      NODE_ENV: 'test',
+      LOG_LEVEL: 'silent',
+      DEMO_MODE: 'false',
+      TRADING_MODE: 'live',
+      LIVE_TRADING_AUTHORIZED: 'true',
+      DATABASE_PATH: ':memory:',
+    });
+    const db = PolyHunterDb.inMemory();
+    databases.push(db);
+    const logger = createLogger({ ...config, logLevel: 'silent' });
+    const engine = new PolyHunterEngine({
+      config,
+      db,
+      logger,
+      gamma: { listMarkets: async () => [] },
+      clob: { getBooks: async () => [] },
+      geoblock: {
+        ensureFresh: async () => ({
+          status: 'ELIGIBLE',
+          blocked: false,
+          ip: '203.0.113.10',
+          country: 'PT',
+          region: null,
+          checkedAt: 1_000_000,
+          reason: null,
+        }),
+        current: () => null,
+      },
+      now: () => 1_000_000,
+    });
+    engines.push(engine);
+
+    await expect(engine.start()).rejects.toThrow(/live execution adapter is not implemented/);
+    expect(engine.health().status).toBe('error');
+    expect(engine.health().liveAllowed).toBe(false);
+  });
+
+  it('starts from live public clients when demo mode is off', async () => {
+    const config = loadConfig({
+      NODE_ENV: 'test',
+      LOG_LEVEL: 'silent',
+      DEMO_MODE: 'false',
+      DATABASE_PATH: ':memory:',
+      MAX_MARKETS: '2',
+    });
+    const db = PolyHunterDb.inMemory();
+    databases.push(db);
+    const logger = createLogger({ ...config, logLevel: 'silent' });
+    const opened: string[] = [];
+    const engine = new PolyHunterEngine({
+      config,
+      db,
+      logger,
+      gamma: {
+        listMarkets: async () => [
+          {
+            id: 'market-1',
+            conditionId: 'condition-1',
+            slug: 'market-1',
+            question: 'Market 1?',
+            endDate: null,
+            liquidity: 100_000,
+            volume24h: 50_000,
+            yesTokenId: 'yes-token',
+            noTokenId: 'no-token',
+            tickSize: 0.01,
+            negRisk: false,
+            active: true,
+            closed: false,
+            acceptingOrders: true,
+          },
+        ],
+      },
+      clob: {
+        getBooks: async () => [
+          {
+            token: { marketId: 'market-1', tokenId: 'yes-token', outcome: 'YES' },
+            book: {
+              conditionId: 'condition-1',
+              assetId: 'yes-token',
+              timestamp: 1_000_000,
+              hash: null,
+              bids: [{ price: 0.48, size: 300 }],
+              asks: [{ price: 0.5, size: 300 }],
+              lastTradePrice: 0.49,
+            },
+            error: null,
+          },
+        ],
+      },
+      geoblock: {
+        ensureFresh: async () => ({
+          status: 'ELIGIBLE',
+          blocked: false,
+          ip: null,
+          country: null,
+          region: null,
+          checkedAt: 1_000_000,
+          reason: null,
+        }),
+        current: () => null,
+      },
+      socketFactory: () => ({
+        connect: () => opened.push('connect'),
+        close: () => opened.push('close'),
+        updateTokens: () => opened.push('update'),
+        isConnected: true,
+        lastMessage: 1_000_000,
+        reconnectCount: 0,
+        lastError: null,
+      }),
+      now: () => 1_000_000,
+    });
+    engines.push(engine);
+
+    await engine.start();
+    expect(engine.health().status).toBe('running');
+    expect(engine.state().markets).toHaveLength(1);
+    expect(opened).toContain('connect');
+    expect(engine.health().provider.connected).toBe(true);
+  });
+
+  it('fails closed when the scanner returns no markets', async () => {
+    const config = loadConfig({
+      NODE_ENV: 'test',
+      LOG_LEVEL: 'silent',
+      DEMO_MODE: 'false',
+      DATABASE_PATH: ':memory:',
+    });
+    const db = PolyHunterDb.inMemory();
+    databases.push(db);
+    const logger = createLogger({ ...config, logLevel: 'silent' });
+    const engine = new PolyHunterEngine({
+      config,
+      db,
+      logger,
+      gamma: { listMarkets: async () => [] },
+      clob: { getBooks: async () => [] },
+      geoblock: {
+        ensureFresh: async () => unknownGeoblock(1_000_000, 'test'),
+        current: () => null,
+      },
+      now: () => 1_000_000,
+    });
+    engines.push(engine);
+    await expect(engine.start()).rejects.toThrow(/no eligible Polymarket markets/);
+    expect(engine.health().status).toBe('error');
+  });
+
+  it('exposes market detail and tolerates idempotent control calls', async () => {
+    const { engine } = harness();
+    await engine.start();
+    expect(engine.marketDetail('unknown')).toBeNull();
+    expect(engine.marketDetail('demo-yes-fed')?.market.id).toBe('demo-fed');
+
+    await engine.control('reset-kill');
+    expect(engine.health().status).toBe('running');
+
+    engine.stop();
+    engine.stop();
+    expect(engine.health().status).toBe('stopped');
+  });
+
+  it('ignores books for tokens outside the subscription set', async () => {
+    const { engine, clock, db } = harness();
+    await engine.start();
+    engine.ingestBook(
+      makeBook({
+        tokenId: 'unknown-token',
+        marketId: 'unknown-market',
+        timestamp: clock.now(),
+      }),
+    );
+    expect(db.listSignals()).toHaveLength(0);
+  });
+
+  it('refuses live mode when the venue geoblock is blocked', async () => {
+    const config = loadConfig({
+      NODE_ENV: 'test',
+      LOG_LEVEL: 'silent',
+      DEMO_MODE: 'false',
+      TRADING_MODE: 'live',
+      LIVE_TRADING_AUTHORIZED: 'true',
+      DATABASE_PATH: ':memory:',
+    });
+    const db = PolyHunterDb.inMemory();
+    databases.push(db);
+    const logger = createLogger({ ...config, logLevel: 'silent' });
+    const engine = new PolyHunterEngine({
+      config,
+      db,
+      logger,
+      gamma: { listMarkets: async () => [] },
+      clob: { getBooks: async () => [] },
+      geoblock: {
+        ensureFresh: async () => ({
+          status: 'BLOCKED',
+          blocked: true,
+          ip: null,
+          country: 'BR',
+          region: null,
+          checkedAt: 1_000_000,
+          reason: 'blocked in BR',
+        }),
+        current: () => null,
+      },
+      now: () => 1_000_000,
+    });
+    engines.push(engine);
+
+    await expect(engine.start()).rejects.toThrow(/live trading is not eligible/);
+    expect(engine.health().status).toBe('error');
+  });
+
+  it('settles a paper position when the market resolves', async () => {
+    const config = loadConfig({
+      NODE_ENV: 'test',
+      LOG_LEVEL: 'silent',
+      DEMO_MODE: 'false',
+      DATABASE_PATH: ':memory:',
+      MIN_EDGE: '0.001',
+      MIN_IMBALANCE: '0.1',
+      MAX_SPREAD: '0.05',
+      MIN_DEPTH_SHARES: '10',
+      ORDER_NOTIONAL: '10',
+      TAKE_PROFIT_EDGE: '0.05',
+      STOP_LOSS_EDGE: '0.2',
+      COOLDOWN_MS: '0',
+    });
+    const db = PolyHunterDb.inMemory();
+    databases.push(db);
+    const logger = createLogger({ ...config, logLevel: 'silent' });
+    let captured: MarketSocketOptions | null = null;
+    const engine = new PolyHunterEngine({
+      config,
+      db,
+      logger,
+      gamma: {
+        listMarkets: async () => [
+          {
+            id: 'market-1',
+            conditionId: 'condition-1',
+            slug: 'market-1',
+            question: 'Market 1?',
+            endDate: null,
+            liquidity: 100_000,
+            volume24h: 50_000,
+            yesTokenId: 'yes-token',
+            noTokenId: 'no-token',
+            tickSize: 0.01,
+            negRisk: false,
+            active: true,
+            closed: false,
+            acceptingOrders: true,
+          },
+        ],
+      },
+      clob: {
+        getBooks: async () => [
+          {
+            token: { marketId: 'market-1', tokenId: 'yes-token', outcome: 'YES' },
+            book: {
+              conditionId: 'condition-1',
+              assetId: 'yes-token',
+              timestamp: 1_000_000,
+              hash: null,
+              bids: [{ price: 0.48, size: 300 }],
+              asks: [{ price: 0.5, size: 300 }],
+              lastTradePrice: 0.49,
+            },
+            error: null,
+          },
+        ],
+      },
+      geoblock: {
+        ensureFresh: async () => ({
+          status: 'ELIGIBLE',
+          blocked: false,
+          ip: null,
+          country: null,
+          region: null,
+          checkedAt: 1_000_000,
+          reason: null,
+        }),
+        current: () => null,
+      },
+      socketFactory: (options) => {
+        captured = options;
+        return {
+          connect: () => undefined,
+          close: () => undefined,
+          updateTokens: () => undefined,
+          isConnected: true,
+          lastMessage: 1_000_000,
+          reconnectCount: 0,
+          lastError: null,
+        };
+      },
+      now: () => 1_000_000,
+    });
+    engines.push(engine);
+    await engine.start();
+
+    engine.ingestBook(
+      makeBook({
+        tokenId: 'yes-token',
+        marketId: 'market-1',
+        outcome: 'YES',
+        timestamp: 1_000_000,
+        bids: [{ price: 0.48, size: 300 }],
+        asks: [{ price: 0.5, size: 100 }],
+      }),
+    );
+    engine.ingestBook(
+      makeBook({
+        tokenId: 'yes-token',
+        marketId: 'market-1',
+        outcome: 'YES',
+        timestamp: 1_000_001,
+        bids: [{ price: 0.48, size: 300 }],
+        asks: [{ price: 0.47, size: 100 }],
+      }),
+    );
+    expect(engine.state().portfolio.positions).toHaveLength(1);
+
+    if (captured === null) {
+      throw new Error('expected a captured socket configuration');
+    }
+    const socketOptions: MarketSocketOptions = captured;
+    socketOptions.onEvent?.({
+      type: 'market_resolved',
+      conditionId: 'condition-1',
+      winningAssetId: 'yes-token',
+      winningOutcome: 'Yes',
+      at: 1_000_002,
+    });
+
+    expect(engine.state().portfolio.positions).toHaveLength(0);
+    expect(db.listTrades().length).toBeGreaterThanOrEqual(2);
+  });
+});
