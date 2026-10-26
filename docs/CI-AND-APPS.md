@@ -5,6 +5,7 @@
 | Workflow                          | What it proves                                                                                        |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `ci.yml` → `quality`              | Biome lint/format, strict typecheck, unit/integration/property tests, coverage gate, production build |
+| `ci.yml` → `windows-quality`      | Clean `npm ci`, lint, typecheck, coverage and build on Windows 24                                     |
 | `ci.yml` → `e2e`                  | Playwright dashboard, navigation, kill switch and reset flow                                          |
 | `codeql.yml` → `codeql`           | GitHub CodeQL security-extended analysis for JavaScript/TypeScript                                    |
 | `security.yml` → `secret-scan`    | Gitleaks full-history secret scan                                                                     |
@@ -18,13 +19,15 @@
 | Dependabot                        | Weekly npm and GitHub Actions updates, grouped minor/patch                                            |
 
 All third-party actions are pinned by commit SHA. Workflow permissions are least-privilege. The
-runner is hardened with `step-security/harden-runner` in the quality job.
+Ubuntu quality job is hardened with `step-security/harden-runner`; the Windows lane relies on
+least-privilege permissions and SHA pinning because harden-runner is Linux-only.
 
 ## Required checks (ruleset intent)
 
 The `main` ruleset should require:
 
 - `quality`
+- `windows-quality`
 - `e2e`
 - `codeql`
 - `security-gate`
