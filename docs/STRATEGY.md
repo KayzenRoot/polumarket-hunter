@@ -131,9 +131,30 @@ The engine records the rejection reasons in the signal ledger and shows them in 
 
 ## Fees
 
-Polymarket CLOB fees vary by market and can be zero. The simulator exposes `FEE_BPS` and applies it
-to notional. Backtests should use the fee schedule that matches the intended venue/market; the
-default of 0 is an assumption, not a universal fact.
+Polymarket fees are per market and, since 2026, mostly taker-only. The public Gamma market object
+exposes `feesEnabled` and a `feeSchedule` with `rate`, `exponent`, `takerOnly` and `rebateRate`.
+The simulator uses:
+
+```text
+fee = shares × rate × (price × (1 - price))^exponent
+```
+
+- When `takerOnly` is true, resting maker fills pay zero and taker fills pay the curve.
+- `feesEnabled: false` means fee-free; a missing or malformed schedule falls back to the global
+  `FEE_BPS` assumption.
+- The CLOB `/fee-rate` endpoint returns `base_fee: 1000` for fee-bearing markets and does not
+  distinguish categories, so the simulator does not use it. The Gamma schedule is the source of
+  truth.
+- Backtests and the research harness accept `--fee-rate`, `--fee-exponent` and `--fee-both-sides`
+  for a session-level assumption. Without `--fee-rate` they use `--fee-bps` as before.
+- Reports print the fee assumption next to the metrics, and the market detail panel shows the live
+  schedule or the fallback.
+- Fees are rounded to the simulator's 2-decimal money precision. The venue rounds fees to 5 decimals;
+  the difference is sub-cent and documented rather than hidden.
+
+The default `FEE_BPS=0` is an assumption, not a universal fact. A zero-fee backtest of a
+fee-bearing market is not comparable to a paper session on that market. The observed fields,
+category samples, fallbacks and limitations are documented in [docs/FEES.md](FEES.md).
 
 ## Backtesting
 

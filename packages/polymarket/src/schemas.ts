@@ -37,6 +37,8 @@ export const gammaMarketSchema = z
     closed: booleanish.optional().default(true),
     acceptingOrders: booleanish.optional().default(false),
     enableOrderBook: booleanish.optional().default(false),
+    feesEnabled: z.unknown().optional(),
+    feeSchedule: z.unknown().optional(),
   })
   .passthrough();
 

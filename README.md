@@ -21,11 +21,12 @@ hard risk controls, replay/backtest and a realtime dashboard.
 - Computes top of book, spread, depth, order-book imbalance and microprice.
 - Runs two transparent strategies: **Micro Maker** (spread capture with inventory risk) and
   **Momentum Taker** (short-horizon momentum forecast).
-- Simulates limit/market fills against the real book, including partial fills, fees, cash
-  reservation and realized/unrealized PnL.
+- Simulates limit/market fills against the real book, including partial fills, per-market taker
+  fee curves (Gamma `feeSchedule`), cash reservation and realized/unrealized PnL.
 - Blocks new exposure on stale or crossed books, wide spreads, missing depth, duplicate orders,
   loss limits, drawdown limits, order-rate limits and the operator kill switch.
-- Persists signals, trades, portfolio snapshots and events to native SQLite (`node:sqlite`).
+- Persists paper sessions, signals, trades, portfolio snapshots and events to native SQLite
+  (`node:sqlite`).
 - Records books to JSONL and replays them through the same strategy/broker for backtesting.
 - Serves a Fastify API, SSE state stream, Prometheus metrics and a React terminal dashboard.
 
@@ -153,7 +154,8 @@ crossed books, timestamps, duplicate hashes and token coverage before the backte
 research harness produces a deterministic 70/30 train/validation report with no-trade and
 passive-hold baselines under `data/reports/`. See [docs/DATA-QUALITY.md](docs/DATA-QUALITY.md) and
 [docs/RESEARCH.md](docs/RESEARCH.md). The backtest uses the same `PaperBroker` and `RiskController`
-as the live paper engine, so fill and risk behavior cannot silently diverge.
+as the live paper engine, so fill and risk behavior cannot silently diverge. Per-market fee fields
+and fallbacks are documented in [docs/FEES.md](docs/FEES.md).
 
 ## Quality and security
 

@@ -6,8 +6,52 @@ import {
   formatBacktestReport,
   generateSyntheticBooks,
   runBacktest,
+  type Strategy,
   type StrategyConfig,
+  topOfBook,
 } from '../src/index.js';
+
+function buyOnceStrategy(): Strategy {
+  let bought = false;
+  return {
+    kind: 'micro-maker',
+    evaluate: (book, context) => {
+      const top = topOfBook(book);
+      if (bought || top === null) {
+        return {
+          action: 'HOLD',
+          tokenId: book.tokenId,
+          marketId: book.marketId,
+          outcome: book.outcome,
+          price: 0,
+          size: 0,
+          fairValue: top?.mid ?? 0,
+          edge: 0,
+          confidence: 0,
+          reasons: ['hold'],
+          createdAt: context.now,
+        };
+      }
+      bought = true;
+      return {
+        action: 'TAKE_BUY',
+        tokenId: book.tokenId,
+        marketId: book.marketId,
+        outcome: book.outcome,
+        price: top.ask,
+        size: 10,
+        fairValue: top.mid,
+        edge: 0,
+        confidence: 1,
+        reasons: ['test taker buy'],
+        createdAt: context.now,
+      };
+    },
+    reset: () => {
+      bought = false;
+    },
+  };
+}
 
 describe('backtest engine', () => {
   it('returns zeroed metrics for an empty recording', () => {
@@ -74,6 +118,35 @@ describe('backtest engine', () => {
     expect(result.metrics.ordersPlaced).toBeGreaterThan(0);
     expect(Number.isFinite(result.metrics.maxDrawdownPct)).toBe(true);
     expect(result.signals.every((signal) => signal.reasons.length > 0)).toBe(true);
+  });
+
+  it('applies a session fee schedule and records the assumption', () => {
+    const books = generateSyntheticBooks({ count: 6, seed: 7, startAt: 1_000_000 });
+    const scheduled = runBacktest({
+      books,
+      strategy: buyOnceStrategy(),
+      strategyConfig: DEFAULT_STRATEGY_CONFIG,
+      riskLimits: DEFAULT_RISK_LIMITS,
+      startingCash: 1000,
+      feeBps: 0,
+      feeSchedule: { rate: 0.05, exponent: 1, takerOnly: true, rebateRate: 0 },
+      orderTtlMs: 15_000,
+    });
+    expect(scheduled.feeAssumption).toContain('rate 0.05');
+    expect(scheduled.metrics.fills).toBeGreaterThan(0);
+    expect(scheduled.metrics.fees).toBeGreaterThan(0);
+
+    const fallback = runBacktest({
+      books,
+      strategy: buyOnceStrategy(),
+      strategyConfig: DEFAULT_STRATEGY_CONFIG,
+      riskLimits: DEFAULT_RISK_LIMITS,
+      startingCash: 1000,
+      feeBps: 100,
+      orderTtlMs: 15_000,
+    });
+    expect(fallback.feeAssumption).toContain('100 bps flat');
+    expect(fallback.metrics.fees).toBeGreaterThan(0);
   });
 
   it('formats a human-readable report', () => {

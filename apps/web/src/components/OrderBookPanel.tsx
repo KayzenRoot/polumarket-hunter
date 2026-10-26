@@ -4,6 +4,31 @@ import { EmptyState } from './EmptyState.js';
 import { CloseIcon } from './Icons.js';
 import { StatusPill } from './StatusPill.js';
 
+function feeLabel(market: MarketDetail['market']): string {
+  if (market.feesEnabled === false) {
+    return 'fee-free';
+  }
+  const schedule = market.feeSchedule;
+  if (schedule === null || schedule === undefined) {
+    return 'fee unknown · FEE_BPS fallback';
+  }
+  if (schedule.rate <= 0) {
+    return 'fee-free';
+  }
+  return `${schedule.takerOnly ? 'taker' : 'both sides'} rate ${formatPct(schedule.rate)} · p(1-p)`;
+}
+
+function marketFeeTone(market: MarketDetail['market']): 'neutral' | 'info' | 'warning' {
+  if (market.feesEnabled === false) {
+    return 'neutral';
+  }
+  const schedule = market.feeSchedule;
+  if (schedule === null || schedule === undefined) {
+    return 'warning';
+  }
+  return schedule.rate > 0 ? 'info' : 'neutral';
+}
+
 function actionTone(action: string): 'positive' | 'warning' | 'neutral' | 'info' {
   if (action === 'PLACE_BID' || action === 'TAKE_BUY') {
     return 'positive';
@@ -76,6 +101,9 @@ export function OrderBookPanel({ detail, loading, onClose }: OrderBookPanelProps
             FLAT
           </StatusPill>
         )}
+        <StatusPill tone={marketFeeTone(detail.market)} dot={false}>
+          {feeLabel(detail.market)}
+        </StatusPill>
         <span className="muted">
           last update {formatDateTime(detail.book?.timestamp ?? null)} · tick{' '}
           {formatPrice(detail.market.tickSize)}

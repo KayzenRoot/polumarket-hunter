@@ -13,6 +13,7 @@ import {
   validateRecording,
 } from '../packages/core/src/index.js';
 import { numberOption } from './args.js';
+import { type FeeSelection, feeSelection } from './fees.js';
 
 function strategyOption(value: string | boolean | undefined): StrategyKind {
   return value === 'micro-maker' ? 'micro-maker' : 'momentum-taker';
@@ -24,6 +25,9 @@ const { values } = parseArgs({
     strategy: { type: 'string', default: 'micro-maker' },
     cash: { type: 'string', default: '1000' },
     'fee-bps': { type: 'string', default: '0' },
+    'fee-rate': { type: 'string' },
+    'fee-exponent': { type: 'string' },
+    'fee-both-sides': { type: 'boolean', default: false },
     edge: { type: 'string' },
     imbalance: { type: 'string' },
     'max-spread': { type: 'string' },
@@ -65,18 +69,35 @@ const strategyConfig: StrategyConfig = {
   stopLossEdge: numberOption(values['stop-loss'], DEFAULT_STRATEGY_CONFIG.stopLossEdge),
 };
 
+let fee: FeeSelection;
+try {
+  fee = feeSelection(values);
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+}
+
 const result = runBacktest({
   books: recording.books,
   strategy: createStrategy(strategyKind, strategyConfig),
   strategyConfig,
   riskLimits: DEFAULT_RISK_LIMITS,
   startingCash: numberOption(values.cash, 1000),
-  feeBps: numberOption(values['fee-bps'], 0),
+  feeBps: fee.feeBps,
+  feeSchedule: fee.feeSchedule,
   orderTtlMs: 15_000,
 });
 
 if (values.json) {
-  const payload = JSON.stringify({ strategy: strategyKind, metrics: result.metrics }, null, 2);
+  const payload = JSON.stringify(
+    {
+      strategy: strategyKind,
+      metrics: result.metrics,
+      feeAssumption: result.feeAssumption,
+    },
+    null,
+    2,
+  );
   if (typeof values.out === 'string') {
     writeFileSync(values.out, payload);
     console.log(`Wrote ${values.out}`);
@@ -91,7 +112,15 @@ if (values.json) {
   if (typeof values.out === 'string') {
     writeFileSync(
       values.out,
-      JSON.stringify({ strategy: strategyKind, metrics: result.metrics }, null, 2),
+      JSON.stringify(
+        {
+          strategy: strategyKind,
+          metrics: result.metrics,
+          feeAssumption: result.feeAssumption,
+        },
+        null,
+        2,
+      ),
     );
     console.log(`Wrote ${values.out}`);
   }

@@ -151,6 +151,22 @@ describe('research harness', () => {
     );
   });
 
+  it('records a venue fee schedule in the config hash and report', () => {
+    const schedule = { rate: 0.05, exponent: 1, takerOnly: true, rebateRate: 0.25 };
+    const scheduled = runResearch({
+      books: flatSeries(10),
+      ...CONFIG,
+      feeSchedule: schedule,
+      configHash: 'scheduled',
+    });
+    expect(scheduled.config.feeSchedule).toEqual(schedule);
+    expect(scheduled.config.feeAssumption).toContain('rate 0.05');
+    expect(baseline(scheduled, 'passive-hold').train.fees).toBeGreaterThan(0);
+    expect(researchConfigJson({ ...CONFIG, feeSchedule: schedule })).not.toBe(
+      researchConfigJson(CONFIG),
+    );
+  });
+
   it('builds a stable config hash input in a fixed key order', () => {
     const reorderedStrategy: StrategyConfig = {
       momentumHorizon: DEFAULT_STRATEGY_CONFIG.momentumHorizon,

@@ -25,6 +25,7 @@ import {
   scoreMarket,
   type Trade,
   topOfBook,
+  ZERO_FEE_SCHEDULE,
 } from '@polyhunter/core';
 import type { PolyHunterDb } from '@polyhunter/persistence';
 import {
@@ -170,6 +171,16 @@ export class PolyHunterEngine implements EnginePort {
       feeBps: this.config.feeBps,
       now: this.now,
       idFactory: this.idFactory,
+      feeScheduleForMarket: (marketId) => {
+        const market = this.markets.get(marketId);
+        if (market === undefined) {
+          return null;
+        }
+        if (market.feesEnabled === false) {
+          return ZERO_FEE_SCHEDULE;
+        }
+        return market.feeSchedule ?? null;
+      },
     });
   }
 
@@ -767,6 +778,8 @@ export class PolyHunterEngine implements EnginePort {
         active: true,
         closed: false,
         acceptingOrders: true,
+        feesEnabled: false,
+        feeSchedule: null,
       },
       {
         id: 'demo-final',
@@ -783,6 +796,8 @@ export class PolyHunterEngine implements EnginePort {
         active: true,
         closed: false,
         acceptingOrders: true,
+        feesEnabled: false,
+        feeSchedule: null,
       },
       {
         id: 'demo-btc',
@@ -799,6 +814,8 @@ export class PolyHunterEngine implements EnginePort {
         active: true,
         closed: false,
         acceptingOrders: true,
+        feesEnabled: false,
+        feeSchedule: null,
       },
     ];
 

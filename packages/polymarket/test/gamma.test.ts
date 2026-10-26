@@ -24,6 +24,36 @@ describe('gamma market mapping', () => {
     });
   });
 
+  it('maps fee schedules and explicit fee-free markets', () => {
+    const paid = mapGammaMarket(
+      makeGammaMarket({
+        feesEnabled: true,
+        feeSchedule: { rate: 0.03, exponent: 1, takerOnly: true, rebateRate: 0.25 },
+      }) as never,
+    );
+    expect(paid).toMatchObject({
+      feesEnabled: true,
+      feeSchedule: { rate: 0.03, exponent: 1, takerOnly: true, rebateRate: 0.25 },
+    });
+
+    const free = mapGammaMarket(
+      makeGammaMarket({ feesEnabled: false, feeSchedule: null }) as never,
+    );
+    expect(free).toMatchObject({ feesEnabled: false, feeSchedule: null });
+
+    const unknown = mapGammaMarket(makeGammaMarket() as never);
+    expect(unknown?.feesEnabled).toBeNull();
+    expect(unknown?.feeSchedule).toBeNull();
+  });
+
+  it('does not invent a fee schedule from malformed data', () => {
+    const market = mapGammaMarket(
+      makeGammaMarket({ feesEnabled: true, feeSchedule: { rate: 'oops' } }) as never,
+    );
+    expect(market?.feesEnabled).toBe(true);
+    expect(market?.feeSchedule).toBeNull();
+  });
+
   it('rejects markets without two clob tokens', () => {
     expect(mapGammaMarket(makeGammaMarket({ clobTokenIds: '["only-one"]' }) as never)).toBeNull();
     expect(mapGammaMarket(makeGammaMarket({ clobTokenIds: '[]' }) as never)).toBeNull();

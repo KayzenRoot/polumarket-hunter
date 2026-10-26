@@ -1,4 +1,4 @@
-import type { Market } from '@polyhunter/core';
+import type { FeeSchedule, Market } from '@polyhunter/core';
 import { z } from 'zod';
 import { PolymarketError, toPolymarketError } from './errors.js';
 import {
@@ -57,6 +57,55 @@ function normalizeTickSize(value: number | undefined): number {
   return 0.01;
 }
 
+function optionalNumber(value: unknown): number | null {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function optionalBoolean(value: unknown): boolean | null {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'number') {
+    return value !== 0;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1') {
+      return true;
+    }
+    if (normalized === 'false' || normalized === '0') {
+      return false;
+    }
+  }
+  return null;
+}
+
+function mapFeeSchedule(value: unknown): FeeSchedule | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return null;
+  }
+  const raw = value as Record<string, unknown>;
+  const rate = optionalNumber(raw.rate);
+  if (rate === null || rate < 0 || rate > 1) {
+    return null;
+  }
+  const exponent = optionalNumber(raw.exponent);
+  const takerOnly = optionalBoolean(raw.takerOnly);
+  return {
+    rate,
+    exponent: exponent !== null && exponent > 0 ? exponent : 1,
+    takerOnly: takerOnly ?? true,
+    rebateRate: optionalNumber(raw.rebateRate),
+  };
+}
+
 export function mapGammaMarket(raw: GammaMarketRaw): Market | null {
   const tokens = parseTokenIds(raw.clobTokenIds);
   const yesTokenId = tokens[0];
@@ -80,6 +129,8 @@ export function mapGammaMarket(raw: GammaMarketRaw): Market | null {
     active: raw.active,
     closed: raw.closed,
     acceptingOrders: raw.acceptingOrders,
+    feesEnabled: optionalBoolean(raw.feesEnabled),
+    feeSchedule: mapFeeSchedule(raw.feeSchedule),
   };
 }
 
