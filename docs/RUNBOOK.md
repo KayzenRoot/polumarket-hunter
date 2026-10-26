@@ -128,6 +128,9 @@ npm run record -- --minutes 10 --markets 8 --min-liquidity 50000
 Output: `data/recordings/polyhunter-<timestamp>.jsonl` (one normalized book per line). Press
 `Ctrl+C` to stop early; the recorder flushes before exit.
 
+Use at least 2 minutes for a recording you intend to validate. The timer starts before the stream
+and the first book, so `--minutes 1` can produce a sub-60s session that fails the validator minimum.
+
 Session reports are rebuilt from SQLite; use the **Reports** dashboard view or
 `GET /api/sessions/:id/report` (JSON) / `/report.csv`. See
 [docs/SESSION-REPORT.md](SESSION-REPORT.md).
