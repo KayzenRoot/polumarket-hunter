@@ -1,4 +1,5 @@
 import type { ControlRequest, MarketDetail, StateResponse } from '@polyhunter/core';
+import { emptyFeedHealth } from '@polyhunter/core';
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, api } from './api.js';
 
@@ -27,7 +28,13 @@ export function useDashboard(): DashboardController {
   const [controlError, setControlError] = useState<string | null>(null);
 
   const applyState = useCallback((next: StateResponse) => {
-    setState(next);
+    setState({
+      ...next,
+      session: next.session ?? null,
+      sessions: next.sessions ?? [],
+      events: next.events ?? [],
+      feedHealth: next.feedHealth ?? emptyFeedHealth(),
+    });
     setError(null);
   }, []);
 
@@ -35,7 +42,6 @@ export function useDashboard(): DashboardController {
     try {
       const next = await api.state();
       applyState(next);
-      setConnection('live');
     } catch (refreshError) {
       setError(messageOf(refreshError));
       setConnection('offline');
