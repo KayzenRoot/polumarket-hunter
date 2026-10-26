@@ -1,7 +1,13 @@
 import type { Market } from '@polyhunter/core';
 import { z } from 'zod';
 import { PolymarketError, toPolymarketError } from './errors.js';
-import { defaultFetch, errorMessage, type FetchLike, type FetchResponse } from './http.js';
+import {
+  defaultFetch,
+  errorMessage,
+  type FetchLike,
+  type FetchResponse,
+  trimTrailingSlashes,
+} from './http.js';
 import { type GammaMarketRaw, gammaMarketSchema } from './schemas.js';
 
 export interface GammaClientOptions {
@@ -86,7 +92,7 @@ export class GammaClient {
   private cache: CacheEntry | null = null;
 
   public constructor(options: GammaClientOptions = {}) {
-    this.baseUrl = (options.baseUrl ?? 'https://gamma-api.polymarket.com').replace(/\/+$/, '');
+    this.baseUrl = trimTrailingSlashes(options.baseUrl ?? 'https://gamma-api.polymarket.com');
     this.fetchImpl = options.fetchImpl ?? defaultFetch();
     this.timeoutMs = options.timeoutMs ?? 15_000;
     this.cacheTtlMs = options.cacheTtlMs ?? 60_000;

@@ -1,7 +1,13 @@
 import { normalizeBook, type OrderBook } from '@polyhunter/core';
 import { z } from 'zod';
 import { PolymarketError, toPolymarketError } from './errors.js';
-import { defaultFetch, type FetchInit, type FetchLike, sleep } from './http.js';
+import {
+  defaultFetch,
+  type FetchInit,
+  type FetchLike,
+  sleep,
+  trimTrailingSlashes,
+} from './http.js';
 import { clobBookSchema, parseTimestamp } from './schemas.js';
 import type { BookFetchResult, RawBook, TokenMetadata } from './types.js';
 
@@ -60,7 +66,7 @@ export class ClobClient {
   private readonly retryBaseMs: number;
 
   public constructor(options: ClobClientOptions = {}) {
-    this.baseUrl = (options.baseUrl ?? 'https://clob.polymarket.com').replace(/\/+$/, '');
+    this.baseUrl = trimTrailingSlashes(options.baseUrl ?? 'https://clob.polymarket.com');
     this.fetchImpl = options.fetchImpl ?? defaultFetch();
     this.timeoutMs = options.timeoutMs ?? 15_000;
     this.maxRetries = Math.max(0, options.maxRetries ?? 3);
