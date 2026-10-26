@@ -9,10 +9,10 @@ updates:
       timezone: Etc/UTC
     open-pull-requests-limit: 5
     cooldown:
-      default-days: 5
+      default-days: 7
       semver-major-days: 14
       semver-minor-days: 7
-      semver-patch-days: 3
+      semver-patch-days: 7
     groups:
       npm-minor-patch:
         patterns:
@@ -37,10 +37,10 @@ updates:
       timezone: Etc/UTC
     open-pull-requests-limit: 5
     cooldown:
-      default-days: 5
+      default-days: 7
       semver-major-days: 14
       semver-minor-days: 7
-      semver-patch-days: 3
+      semver-patch-days: 7
     groups:
       actions-minor-patch:
         patterns:
