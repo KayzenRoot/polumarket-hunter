@@ -1,6 +1,6 @@
 # Production contract — PolyHunter v0.1.0
 
-Status: **DRAFT — pending owner approval**
+Status: **APPROVED — 2026-10-26**
 Target: v0.1.0, paper-first local production
 Repository: https://github.com/KayzenRoot/polumarket-hunter
 Owner: KayzenRoot
@@ -111,6 +111,12 @@ Upgrade procedure:
 Rollback: stop, restore the backup, checkout the previous tag, `npm ci`, `npm run build`, start.
 The release notes must state whether the migration is reversible.
 
+### Release naming
+
+The current `v0.1.0` tag/release is a bootstrap preview created before the production gate. At the
+gate it will be deleted and recreated on the production commit, with an explicit owner approval and
+a temporary tag-ruleset exception. A protected tag is never moved silently.
+
 ## 9. Quality and release gates
 
 - `npm run ci` green on Linux and Windows.
@@ -143,11 +149,12 @@ The release notes must state whether the migration is reversible.
 
 ## 12. Approval record
 
-- [ ] Owner has read this contract.
-- [ ] Owner accepts the paper-only and no-bypass boundaries.
-- [ ] Owner accepts the supported environment and limitations.
-- [ ] Owner approves v0.1.0 production scope.
+- [x] Owner has read this contract.
+- [x] Owner accepts the paper-only and no-bypass boundaries.
+- [x] Owner accepts the supported environment and limitations.
+- [x] Owner approves v0.1.0 production scope.
 
-Approval comment: _pending_
+Approval comment: **Approved by KayzenRoot (owner) on 2026-10-26.** The owner also chose to recreate
+the `v0.1.0` tag at the production gate rather than shipping a separate `v0.1.1`.
 
 Linked plan: [PRODUCTION-PLAN.md](PRODUCTION-PLAN.md)
