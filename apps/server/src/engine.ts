@@ -1,5 +1,6 @@
 import {
   actionToSide,
+  buildSessionReport,
   type ControlRequest,
   createStrategy,
   type EngineHealth,
@@ -19,6 +20,7 @@ import {
   RiskController,
   type RiskDecision,
   type RiskState,
+  type SessionReport,
   type Signal,
   type StateResponse,
   type Strategy,
@@ -572,6 +574,19 @@ export class PolyHunterEngine implements EnginePort {
 
   public sessions(limit = 20): readonly PaperSession[] {
     return this.db.listRuns(Math.max(1, Math.min(limit, 100)));
+  }
+
+  public sessionReport(id: string): SessionReport | null {
+    const session = this.db.getRun(id);
+    if (session === null) {
+      return null;
+    }
+    return buildSessionReport({
+      session,
+      trades: this.db.listSessionTrades(id),
+      signals: this.db.listSessionSignals(id),
+      snapshots: this.db.listSessionSnapshots(id),
+    });
   }
 
   public state(): StateResponse {

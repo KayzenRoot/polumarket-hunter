@@ -27,6 +27,13 @@ test.describe('PolyHunter dashboard', () => {
     await expect(page.getByRole('combobox', { name: 'Filter trades by session' })).toBeVisible();
     await expect(page.getByText(/^session ses_/)).toBeVisible();
 
+    await page.getByRole('button', { name: 'Reports' }).click();
+    await expect(page.getByRole('heading', { name: 'Session report' })).toBeVisible();
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Download CSV' }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/^session-.*\.csv$/);
+
     await page.getByRole('button', { name: 'Risk' }).click();
     await expect(page.getByRole('heading', { name: 'Risk and compliance' })).toBeVisible();
     await expect(

@@ -7,6 +7,7 @@ import type {
   PortfolioSnapshot,
   PublicConfig,
   RiskState,
+  SessionReport,
   Signal,
   StateResponse,
   Trade,
@@ -19,6 +20,7 @@ import {
   makePortfolio,
   makeRiskLimits,
   makeSession,
+  makeSessionReport,
   makeSignal,
   makeTrade,
 } from '@polyhunter/testkit';
@@ -136,6 +138,8 @@ export class FakeEngine implements EnginePort {
   public readonly controls: ControlRequest['action'][] = [];
   public readonly tradeSessionFilters: (string | undefined)[] = [];
   public readonly signalSessionFilters: (string | undefined)[] = [];
+  public reportValue: SessionReport = makeSessionReport();
+  public readonly reportRequests: string[] = [];
   public throwOnControl = false;
   public throwOnState = false;
   private readonly listeners = new Set<(state: StateResponse) => void>();
@@ -183,6 +187,11 @@ export class FakeEngine implements EnginePort {
 
   public sessions(limit: number): readonly PaperSession[] {
     return this.stateValue.sessions.slice(0, limit);
+  }
+
+  public sessionReport(id: string): SessionReport | null {
+    this.reportRequests.push(id);
+    return id === this.reportValue.session.id ? this.reportValue : null;
   }
 
   public portfolio(): PortfolioSnapshot {

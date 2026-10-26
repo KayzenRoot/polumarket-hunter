@@ -105,6 +105,57 @@ function mapSession(row: Record<string, SqlValue | undefined>): PaperSession {
   };
 }
 
+function mapSignalRow(row: Record<string, SqlValue | undefined>): Signal {
+  return {
+    id: asString(row.id),
+    at: asNumber(row.at),
+    marketId: asString(row.market_id),
+    tokenId: asString(row.token_id),
+    outcome: asString(row.outcome) === 'NO' ? 'NO' : 'YES',
+    action: asString(row.action) as Signal['action'],
+    fairValue: asNumber(row.fair_value),
+    marketPrice: asNumber(row.market_price),
+    edge: asNumber(row.edge),
+    confidence: asNumber(row.confidence),
+    accepted: asBoolean(row.accepted),
+    reasons: parseReasons(row.reasons),
+  };
+}
+
+function mapTradeRow(row: Record<string, SqlValue | undefined>): Trade {
+  return {
+    id: asString(row.id),
+    at: asNumber(row.at),
+    marketId: asString(row.market_id),
+    tokenId: asString(row.token_id),
+    outcome: asString(row.outcome) === 'NO' ? 'NO' : 'YES',
+    side: asString(row.side) === 'SELL' ? 'SELL' : 'BUY',
+    price: asNumber(row.price),
+    size: asNumber(row.size),
+    notional: asNumber(row.notional),
+    fee: asNumber(row.fee),
+    realizedPnl: asNumber(row.realized_pnl),
+    orderId: asString(row.order_id),
+    mode: asString(row.mode) === 'live' ? 'live' : 'paper',
+  };
+}
+
+function mapSnapshotRow(row: Record<string, SqlValue | undefined>): PortfolioSnapshot {
+  return {
+    startingCash: asNumber(row.starting_cash),
+    cash: asNumber(row.cash),
+    reservedCash: asNumber(row.reserved_cash),
+    equity: asNumber(row.equity),
+    exposure: asNumber(row.exposure),
+    realizedPnl: asNumber(row.realized_pnl),
+    unrealizedPnl: asNumber(row.unrealized_pnl),
+    totalPnl: asNumber(row.total_pnl),
+    positions: parsePositions(row.positions),
+    openOrders: asNumber(row.open_orders),
+    updatedAt: asNumber(row.at),
+  };
+}
+
 const MIGRATIONS = `
 CREATE TABLE IF NOT EXISTS markets (
   id TEXT PRIMARY KEY,
@@ -337,20 +388,7 @@ export class PolyHunterDb {
             .prepare(`${columns} WHERE session_id = ? ORDER BY at DESC LIMIT ?`)
             .all(sessionId, limit);
 
-    return rows.map((row) => ({
-      id: asString(row.id),
-      at: asNumber(row.at),
-      marketId: asString(row.market_id),
-      tokenId: asString(row.token_id),
-      outcome: asString(row.outcome) === 'NO' ? 'NO' : 'YES',
-      action: asString(row.action) as Signal['action'],
-      fairValue: asNumber(row.fair_value),
-      marketPrice: asNumber(row.market_price),
-      edge: asNumber(row.edge),
-      confidence: asNumber(row.confidence),
-      accepted: asBoolean(row.accepted),
-      reasons: parseReasons(row.reasons),
-    }));
+    return rows.map(mapSignalRow);
   }
 
   public insertTrade(trade: Trade, sessionId = 'legacy'): void {
@@ -389,21 +427,7 @@ export class PolyHunterDb {
             .prepare(`${columns} WHERE session_id = ? ORDER BY at DESC LIMIT ?`)
             .all(sessionId, limit);
 
-    return rows.map((row) => ({
-      id: asString(row.id),
-      at: asNumber(row.at),
-      marketId: asString(row.market_id),
-      tokenId: asString(row.token_id),
-      outcome: asString(row.outcome) === 'NO' ? 'NO' : 'YES',
-      side: asString(row.side) === 'SELL' ? 'SELL' : 'BUY',
-      price: asNumber(row.price),
-      size: asNumber(row.size),
-      notional: asNumber(row.notional),
-      fee: asNumber(row.fee),
-      realizedPnl: asNumber(row.realized_pnl),
-      orderId: asString(row.order_id),
-      mode: asString(row.mode) === 'live' ? 'live' : 'paper',
-    }));
+    return rows.map(mapTradeRow);
   }
 
   public insertPortfolioSnapshot(snapshot: PortfolioSnapshot, sessionId = 'legacy'): void {
@@ -440,19 +464,40 @@ export class PolyHunterDb {
             .prepare(`${columns} WHERE session_id = ? ORDER BY at DESC LIMIT ?`)
             .all(sessionId, limit);
 
-    return rows.map((row) => ({
-      startingCash: asNumber(row.starting_cash),
-      cash: asNumber(row.cash),
-      reservedCash: asNumber(row.reserved_cash),
-      equity: asNumber(row.equity),
-      exposure: asNumber(row.exposure),
-      realizedPnl: asNumber(row.realized_pnl),
-      unrealizedPnl: asNumber(row.unrealized_pnl),
-      totalPnl: asNumber(row.total_pnl),
-      positions: parsePositions(row.positions),
-      openOrders: asNumber(row.open_orders),
-      updatedAt: asNumber(row.at),
-    }));
+    return rows.map(mapSnapshotRow);
+  }
+
+  public listSessionSignals(sessionId: string): Signal[] {
+    const rows = this.db
+      .prepare(
+        `SELECT id, at, market_id, token_id, outcome, action, fair_value, market_price,
+          edge, confidence, accepted, reasons
+        FROM signals WHERE session_id = ? ORDER BY at ASC, id ASC`,
+      )
+      .all(sessionId);
+    return rows.map(mapSignalRow);
+  }
+
+  public listSessionTrades(sessionId: string): Trade[] {
+    const rows = this.db
+      .prepare(
+        `SELECT id, at, market_id, token_id, outcome, side, price, size, notional,
+          fee, realized_pnl, order_id, mode
+        FROM trades WHERE session_id = ? ORDER BY at ASC, id ASC`,
+      )
+      .all(sessionId);
+    return rows.map(mapTradeRow);
+  }
+
+  public listSessionSnapshots(sessionId: string): PortfolioSnapshot[] {
+    const rows = this.db
+      .prepare(
+        `SELECT at, starting_cash, cash, reserved_cash, equity, exposure, realized_pnl,
+          unrealized_pnl, total_pnl, positions, open_orders
+        FROM portfolio_snapshots WHERE session_id = ? ORDER BY at ASC, id ASC`,
+      )
+      .all(sessionId);
+    return rows.map(mapSnapshotRow);
   }
 
   public insertRun(session: PaperSession): void {

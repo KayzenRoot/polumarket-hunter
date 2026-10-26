@@ -3,6 +3,7 @@ import type {
   ControlRequest,
   MarketDetail,
   PaperSession,
+  SessionReport,
   Signal,
   StateResponse,
   Trade,
@@ -40,15 +41,19 @@ export function setApiToken(token: string | null): void {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers = new Headers(init?.headers);
-  headers.set('accept', 'application/json');
-  if (init?.body !== undefined) {
-    headers.set('content-type', 'application/json');
-  }
+function authHeaders(accept = 'application/json'): Headers {
+  const headers = new Headers({ accept });
   const token = getApiToken();
   if (token !== null) {
     headers.set('x-api-token', token);
+  }
+  return headers;
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = authHeaders();
+  if (init?.body !== undefined) {
+    headers.set('content-type', 'application/json');
   }
 
   const response = await fetch(path, { ...init, headers });
@@ -84,6 +89,17 @@ export const api = {
       params.set('session', sessionId);
     }
     return request<readonly Signal[]>(`/api/signals?${params.toString()}`);
+  },
+  sessionReport: (id: string): Promise<SessionReport> =>
+    request<SessionReport>(`/api/sessions/${encodeURIComponent(id)}/report`),
+  sessionReportCsv: async (id: string): Promise<string> => {
+    const response = await fetch(`/api/sessions/${encodeURIComponent(id)}/report.csv`, {
+      headers: authHeaders('text/csv'),
+    });
+    if (!response.ok) {
+      throw new ApiError('request_failed', `server returned HTTP ${response.status}`);
+    }
+    return response.text();
   },
   marketDetail: (tokenId: string): Promise<MarketDetail> =>
     request<MarketDetail>(`/api/markets/${encodeURIComponent(tokenId)}`),

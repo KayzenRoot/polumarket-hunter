@@ -55,6 +55,15 @@ export function TradesIcon(props: IconProps) {
   );
 }
 
+export function ReportsIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M6 3h8l4 4v14H6z" />
+      <path d="M14 3v5h5M9 13h6M9 17h6" />
+    </svg>
+  );
+}
+
 export function RiskIcon(props: IconProps) {
   return (
     <svg {...base(props)}>

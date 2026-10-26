@@ -9,6 +9,7 @@ export * from './portfolio.js';
 export * from './recording.js';
 export * from './research.js';
 export * from './risk.js';
+export * from './session-report.js';
 export * from './strategy.js';
 export * from './synthetic.js';
 export * from './types.js';

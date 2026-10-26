@@ -5,6 +5,7 @@ import type {
   PaperSession,
   PortfolioSnapshot,
   RiskState,
+  SessionReport,
   Signal,
   StateResponse,
   Trade,
@@ -17,6 +18,7 @@ export interface EnginePort {
   trades(limit: number, sessionId?: string): readonly Trade[];
   signals(limit: number, sessionId?: string): readonly Signal[];
   sessions(limit: number): readonly PaperSession[];
+  sessionReport(id: string): SessionReport | null;
   portfolio(): PortfolioSnapshot;
   risk(): RiskState;
   control(action: ControlRequest['action']): Promise<void>;

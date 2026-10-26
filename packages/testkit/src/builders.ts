@@ -8,6 +8,7 @@ import type {
   PortfolioSnapshot,
   Position,
   RiskLimits,
+  SessionReport,
   Signal,
   StrategyIntent,
   Trade,
@@ -212,6 +213,38 @@ export function makeSession(overrides: Partial<PaperSession> = {}): PaperSession
     startingCash: 1000,
     endingEquity: null,
     stopReason: null,
+    ...overrides,
+  };
+}
+
+export function makeSessionReport(overrides: Partial<SessionReport> = {}): SessionReport {
+  const session = overrides.session ?? makeSession();
+  return {
+    session,
+    metrics: {
+      incomplete: session.endedAt === null,
+      startingCash: session.startingCash,
+      endingEquity: session.startingCash,
+      totalReturnPct: 0,
+      realizedPnl: 0,
+      unrealizedPnl: 0,
+      totalPnl: 0,
+      fees: 0,
+      trades: 0,
+      buys: 0,
+      sells: 0,
+      wins: 0,
+      losses: 0,
+      winRate: 0,
+      signals: 0,
+      acceptedSignals: 0,
+      rejectedSignals: 0,
+      rejectionsByReason: {},
+    },
+    equityCurve: [],
+    trades: [],
+    signals: [],
+    rejections: [],
     ...overrides,
   };
 }

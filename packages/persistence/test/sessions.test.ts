@@ -65,6 +65,29 @@ describe('paper sessions', () => {
     db.close();
   });
 
+  it('lists a full session report in ascending time order', () => {
+    const db = PolyHunterDb.inMemory();
+    db.insertSignal(makeSignal({ id: 'signal-late', at: 2000 }), 'session-a');
+    db.insertSignal(makeSignal({ id: 'signal-early', at: 1000 }), 'session-a');
+    db.insertTrade(makeTrade({ id: 'trade-late', at: 2000 }), 'session-a');
+    db.insertTrade(makeTrade({ id: 'trade-early', at: 1000 }), 'session-a');
+    db.insertPortfolioSnapshot(makePortfolio({ updatedAt: 2000 }), 'session-a');
+    db.insertPortfolioSnapshot(makePortfolio({ updatedAt: 1000 }), 'session-a');
+
+    expect(db.listSessionSignals('session-a').map((signal) => signal.id)).toEqual([
+      'signal-early',
+      'signal-late',
+    ]);
+    expect(db.listSessionTrades('session-a').map((trade) => trade.id)).toEqual([
+      'trade-early',
+      'trade-late',
+    ]);
+    expect(db.listSessionSnapshots('session-a').map((snapshot) => snapshot.updatedAt)).toEqual([
+      1000, 2000,
+    ]);
+    db.close();
+  });
+
   it('migrates a legacy database and stays repeatable', () => {
     const directory = mkdtempSync(join(tmpdir(), 'polyhunter-sessions-'));
     const path = join(directory, 'legacy.db');

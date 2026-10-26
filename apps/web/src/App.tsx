@@ -16,6 +16,7 @@ import { KpiCard } from './components/KpiCard.js';
 import { MarketsTable } from './components/MarketsTable.js';
 import { OrderBookPanel } from './components/OrderBookPanel.js';
 import { PositionsTable } from './components/PositionsTable.js';
+import { ReportsView } from './components/ReportsView.js';
 import { RiskPanel } from './components/RiskPanel.js';
 import { Sidebar, type View } from './components/Sidebar.js';
 import { SignalsFeed } from './components/SignalsFeed.js';
@@ -568,6 +569,10 @@ export default function App() {
                 <TradesTable trades={displayedTrades} markets={markets} />
               </section>
             </>
+          ) : null}
+
+          {view === 'reports' ? (
+            <ReportsView sessions={sessions} currentSession={session} markets={markets} />
           ) : null}
 
           {view === 'risk' ? (
