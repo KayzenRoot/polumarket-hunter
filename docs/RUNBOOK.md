@@ -107,7 +107,8 @@ Recovery:
 3. Reset the kill switch explicitly and watch the first books before leaving it unattended.
 
 Pause, cancel-all and flatten semantics are documented in
-[docs/OPERATOR-CONTROLS.md](OPERATOR-CONTROLS.md).
+[docs/OPERATOR-CONTROLS.md](OPERATOR-CONTROLS.md). Token rotation, TLS and control-plane audit are
+in [docs/SECURITY.md](SECURITY.md).
 
 ## Production-style local run
 

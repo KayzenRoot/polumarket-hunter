@@ -196,6 +196,7 @@ describe('http api', () => {
     });
     expect(unauthorized.statusCode).toBe(401);
     expect((unauthorized.json() as { error: { code: string } }).error.code).toBe('unauthorized');
+    expect(unauthorized.body).not.toContain('top-secret');
 
     const authorized = await app.inject({
       method: 'POST',
@@ -212,6 +213,55 @@ describe('http api', () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers['content-type']).toContain('text/plain');
     expect(response.body).toContain('polyhunter_up 1');
+  });
+
+  it('rotates API tokens only after a restart', async () => {
+    const first = await build({ API_TOKEN: 'first-token' });
+    const oldWorks = await first.app.inject({
+      method: 'POST',
+      url: '/api/control',
+      headers: { 'x-api-token': 'first-token' },
+      payload: { action: 'pause' },
+    });
+    expect(oldWorks.statusCode).toBe(200);
+    const newFails = await first.app.inject({
+      method: 'POST',
+      url: '/api/control',
+      headers: { 'x-api-token': 'second-token' },
+      payload: { action: 'resume' },
+    });
+    expect(newFails.statusCode).toBe(401);
+
+    const second = await build({ API_TOKEN: 'second-token' });
+    const oldFails = await second.app.inject({
+      method: 'POST',
+      url: '/api/control',
+      headers: { 'x-api-token': 'first-token' },
+      payload: { action: 'pause' },
+    });
+    expect(oldFails.statusCode).toBe(401);
+    const newWorks = await second.app.inject({
+      method: 'POST',
+      url: '/api/control',
+      headers: { 'x-api-token': 'second-token' },
+      payload: { action: 'resume' },
+    });
+    expect(newWorks.statusCode).toBe(200);
+  });
+
+  it('rate limits control actions', async () => {
+    const { app } = await build();
+    const statuses: number[] = [];
+    for (let index = 0; index < 11; index += 1) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/control',
+        payload: { action: 'pause' },
+      });
+      statuses.push(response.statusCode);
+    }
+    expect(statuses.slice(0, 10).every((status) => status === 200)).toBe(true);
+    expect(statuses.at(-1)).toBe(429);
   });
 
   it('serves a fallback root when the web build is missing', async () => {

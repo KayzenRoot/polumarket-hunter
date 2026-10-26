@@ -406,6 +406,17 @@ describe('paper engine', () => {
     expect(alerts[0]).toMatchObject({ kind: 'auto-kill', mode: 'paper' });
     expect(db.listEvents().map((event) => event.kind)).toContain('auto_kill');
     await expect(engine.start()).rejects.toThrow(/kill switch is active/);
+    await expect(engine.control('start', 'dashboard')).rejects.toThrow(/kill switch is active/);
+    expect(
+      db
+        .listEvents()
+        .some(
+          (event) =>
+            event.kind === 'operator_action' &&
+            event.severity === 'error' &&
+            event.details?.includes('"result":"failed"') === true,
+        ),
+    ).toBe(true);
 
     engine.stop();
     await expect(engine.start()).rejects.toThrow(/kill switch is active/);

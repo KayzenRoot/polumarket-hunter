@@ -466,37 +466,49 @@ export class PolyHunterEngine implements EnginePort {
 
   public async control(action: ControlRequest['action'], actor = 'operator'): Promise<void> {
     let detail: Record<string, unknown> = {};
-    switch (action) {
-      case 'start':
-        await this.start();
-        break;
-      case 'stop':
-        this.stop();
-        break;
-      case 'pause':
-        detail = { canceledOrders: this.pause() };
-        break;
-      case 'resume':
-        this.resume();
-        break;
-      case 'cancel-all':
-        detail = { canceledOrders: this.cancelAll() };
-        break;
-      case 'flatten':
-        detail = { ...this.flatten() };
-        break;
-      case 'kill':
-        this.kill('operator kill switch');
-        break;
-      case 'reset-kill':
-        this.resetKill();
-        break;
-      default:
-        throw new Error(`unsupported control action: ${String(action)}`);
+    try {
+      switch (action) {
+        case 'start':
+          await this.start();
+          break;
+        case 'stop':
+          this.stop();
+          break;
+        case 'pause':
+          detail = { canceledOrders: this.pause() };
+          break;
+        case 'resume':
+          this.resume();
+          break;
+        case 'cancel-all':
+          detail = { canceledOrders: this.cancelAll() };
+          break;
+        case 'flatten':
+          detail = { ...this.flatten() };
+          break;
+        case 'kill':
+          this.kill('operator kill switch');
+          break;
+        case 'reset-kill':
+          this.resetKill();
+          break;
+        default:
+          throw new Error(`unsupported control action: ${String(action)}`);
+      }
+    } catch (error) {
+      this.recordEvent('operator_action', 'error', `operator action failed: ${action}`, {
+        action,
+        actor,
+        result: 'failed',
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      this.emitState();
+      throw error;
     }
     this.recordEvent('operator_action', 'info', `operator action: ${action}`, {
       action,
       actor,
+      result: 'ok',
       ...detail,
     });
     this.emitState();
