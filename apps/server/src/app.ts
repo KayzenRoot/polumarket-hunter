@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
+import { sessionReportCsv } from '@polyhunter/core';
 import Fastify, {
   type FastifyBaseLogger,
   type FastifyError,
@@ -29,6 +30,10 @@ const controlSchema = z.object({
 
 const tokenParamsSchema = z.object({
   tokenId: z.string().min(1).max(256),
+});
+
+const sessionParamsSchema = z.object({
+  sessionId: z.string().min(1).max(128),
 });
 
 const limitQuerySchema = z.object({
@@ -110,6 +115,35 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   app.get('/api/health', async () => ok(engine.health()));
   app.get('/api/state', async () => ok(engine.state()));
   app.get('/api/sessions', async () => ok(engine.sessions(50)));
+
+  app.get('/api/sessions/:sessionId/report', async (request, reply) => {
+    const parsed = sessionParamsSchema.safeParse(request.params);
+    if (!parsed.success) {
+      return reply.code(400).send(fail('invalid_params', 'sessionId is required'));
+    }
+    const report = engine.sessionReport(parsed.data.sessionId);
+    if (report === null) {
+      return reply.code(404).send(fail('not_found', 'session not found'));
+    }
+    return ok(report);
+  });
+
+  app.get('/api/sessions/:sessionId/report.csv', async (request, reply) => {
+    const parsed = sessionParamsSchema.safeParse(request.params);
+    if (!parsed.success) {
+      return reply.code(400).send(fail('invalid_params', 'sessionId is required'));
+    }
+    const report = engine.sessionReport(parsed.data.sessionId);
+    if (report === null) {
+      return reply.code(404).send(fail('not_found', 'session not found'));
+    }
+    return reply
+      .code(200)
+      .header('content-disposition', `attachment; filename="session-${report.session.id}.csv"`)
+      .type('text/csv; charset=utf-8')
+      .send(sessionReportCsv(report));
+  });
+
   app.get('/api/markets', async () => ok(engine.state().markets));
   app.get('/api/portfolio', async () => ok(engine.portfolio()));
   app.get('/api/risk', async () => ok(engine.risk()));

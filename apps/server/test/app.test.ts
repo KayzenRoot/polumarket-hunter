@@ -107,6 +107,33 @@ describe('http api', () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it('serves a session report and CSV export', async () => {
+    const { app, engine } = await build();
+    const report = await app.inject({ method: 'GET', url: '/api/sessions/session-test/report' });
+    expect(report.statusCode).toBe(200);
+    expect((report.json() as { data: { session: { id: string } } }).data.session.id).toBe(
+      'session-test',
+    );
+    expect(engine.reportRequests).toContain('session-test');
+
+    const csv = await app.inject({ method: 'GET', url: '/api/sessions/session-test/report.csv' });
+    expect(csv.statusCode).toBe(200);
+    expect(csv.headers['content-type']).toContain('text/csv');
+    expect(csv.headers['content-disposition']).toContain('session-session-test.csv');
+    expect(csv.body).toContain('# trades');
+    expect(csv.body).toContain('metric,value');
+  });
+
+  it('returns 404 for an unknown session report', async () => {
+    const { app } = await build();
+    const response = await app.inject({ method: 'GET', url: '/api/sessions/missing/report' });
+    expect(response.statusCode).toBe(404);
+    expect((response.json() as { error: { code: string } }).error.code).toBe('not_found');
+
+    const csv = await app.inject({ method: 'GET', url: '/api/sessions/missing/report.csv' });
+    expect(csv.statusCode).toBe(404);
+  });
+
   it('returns a market detail and a JSON 404 for an unknown token', async () => {
     const { app } = await build();
     const found = await app.inject({ method: 'GET', url: '/api/markets/yes-token' });

@@ -1,9 +1,9 @@
 import type { EngineHealth, PaperSession } from '@polyhunter/core';
 import { formatUsd, shortToken } from '@polyhunter/core';
-import { MarketsIcon, OverviewIcon, RiskIcon, TradesIcon } from './Icons.js';
+import { MarketsIcon, OverviewIcon, ReportsIcon, RiskIcon, TradesIcon } from './Icons.js';
 import { StatusPill } from './StatusPill.js';
 
-export type View = 'overview' | 'markets' | 'trades' | 'risk';
+export type View = 'overview' | 'markets' | 'trades' | 'reports' | 'risk';
 
 interface SidebarProps {
   readonly view: View;
@@ -18,6 +18,7 @@ const ITEMS: readonly { id: View; label: string; icon: typeof OverviewIcon }[] =
   { id: 'overview', label: 'Overview', icon: OverviewIcon },
   { id: 'markets', label: 'Markets', icon: MarketsIcon },
   { id: 'trades', label: 'Trades', icon: TradesIcon },
+  { id: 'reports', label: 'Reports', icon: ReportsIcon },
   { id: 'risk', label: 'Risk', icon: RiskIcon },
 ];
 
