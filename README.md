@@ -70,6 +70,16 @@ Public-data smoke test:
 npm run smoke
 ```
 
+## Production path
+
+v0.1.0 targets a local, single-user, paper-first production release. The scope is defined in the
+[production contract](docs/PRODUCTION-CONTRACT.md); the execution order, gates and PR protocol are
+in the [production plan](docs/PRODUCTION-PLAN.md). The backlog lives in the
+[v0.1.0 milestone](https://github.com/KayzenRoot/polumarket-hunter/milestone/1).
+
+Live execution is not part of v0.1.0. The geoblock currently reports `BLOCKED` for BR; there is no
+VPN/proxy bypass and no signing code in the repository.
+
 ## Architecture
 
 ```text
