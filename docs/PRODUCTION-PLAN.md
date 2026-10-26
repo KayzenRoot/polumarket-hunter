@@ -134,14 +134,14 @@ not confuse it with the production artifact.
 
 ## 6. Gates
 
-| Gate           | Required evidence                                      | Issues                  |
-| -------------- | ------------------------------------------------------ | ----------------------- |
-| G0 Contract    | Contract approved by owner                             | #15 — closed 2026-10-26 |
-| G1 Correctness | Tick/session/fault tests green; CI green               | #16, #17, #19           |
-| G2 Evidence    | 3 validated sessions, baselines, decision memo         | #27, #28, #29, #30      |
-| G3 Operations  | Doctor, retention/backup, report, control audit        | #18, #20–#26            |
-| G4 Release     | Windows CI, Docker, SBOM/checksums, clean runbook      | #31–#35                 |
-| G5 Sign-off    | Owner approval; release naming decision; no open P0/P1 | all P0/P1               |
+| Gate           | Required evidence                                      | Issues                            |
+| -------------- | ------------------------------------------------------ | --------------------------------- |
+| G0 Contract    | Contract approved by owner                             | #15 — closed 2026-10-26           |
+| G1 Correctness | Tick/session/fault tests green; CI green               | #16, #17, #19 — closed 2026-10-26 |
+| G2 Evidence    | 3 validated sessions, baselines, decision memo         | #27, #28, #29, #30                |
+| G3 Operations  | Doctor, retention/backup, report, control audit        | #18, #20–#26                      |
+| G4 Release     | Windows CI, Docker, SBOM/checksums, clean runbook      | #31–#35                           |
+| G5 Sign-off    | Owner approval; release naming decision; no open P0/P1 | all P0/P1                         |
 
 A gate is not “mostly done”. It is open until every required issue is closed with evidence.
 
@@ -191,16 +191,16 @@ Do not compress the evidence gate to hit a date.
 
 As of 2026-10-26:
 
-- v0.1.0 production: **22 open**, 3 closed (#15, #16, #17).
+- v0.1.0 production: **21 open**, 4 closed (#15, #16, #17, #19).
 - v0.1.x hardening: **6 open**.
 - v0.2.0 live readiness: **6 open, blocked**.
-- Current gate: **G1 — correctness**.
+- Current gate: **G2 — evidence**.
 
 ## 11. Next action
 
-1. Create the #19 branch `feat/issue-19-provider-faults` from `main`.
-2. Add fixture-driven fault-injection tests for Gamma, CLOB, WebSocket and geoblock failures.
-3. Assert fail-closed behavior for stale, crossed, malformed and missing data.
-4. Keep the #17 session contract intact: a provider fault must not leak a session into the next run.
+1. Run #27 (recording validator) and #28 (research harness) in parallel, then #30 (fee assumptions).
+2. Use #27 fixtures to harden schema and freshness checks before recording real sessions.
+3. After #27, #28 and #30 are merged, run #29: three validated sessions and the decision memo.
+4. Do not tune the strategy before the #29 evidence is recorded.
 
 The first production PR should be small and boring. That is the point.
