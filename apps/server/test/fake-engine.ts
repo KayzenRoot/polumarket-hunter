@@ -3,6 +3,7 @@ import type {
   EngineHealth,
   MarketDetail,
   MarketView,
+  PaperSession,
   PortfolioSnapshot,
   PublicConfig,
   RiskState,
@@ -16,6 +17,7 @@ import {
   makeMarket,
   makePortfolio,
   makeRiskLimits,
+  makeSession,
   makeSignal,
   makeTrade,
 } from '@polyhunter/testkit';
@@ -111,6 +113,8 @@ export function makeMarketView(overrides: Partial<MarketView> = {}): MarketView 
 export function makeState(overrides: Partial<StateResponse> = {}): StateResponse {
   return {
     health: makeHealth(),
+    session: makeSession(),
+    sessions: [makeSession()],
     markets: [makeMarketView()],
     portfolio: makePortfolio(),
     trades: [makeTrade()],
@@ -128,6 +132,8 @@ export function makeState(overrides: Partial<StateResponse> = {}): StateResponse
 export class FakeEngine implements EnginePort {
   public stateValue: StateResponse;
   public readonly controls: ControlRequest['action'][] = [];
+  public readonly tradeSessionFilters: (string | undefined)[] = [];
+  public readonly signalSessionFilters: (string | undefined)[] = [];
   public throwOnControl = false;
   public throwOnState = false;
   private readonly listeners = new Set<(state: StateResponse) => void>();
@@ -163,12 +169,18 @@ export class FakeEngine implements EnginePort {
     };
   }
 
-  public trades(limit: number): readonly Trade[] {
+  public trades(limit: number, sessionId?: string): readonly Trade[] {
+    this.tradeSessionFilters.push(sessionId);
     return this.stateValue.trades.slice(0, limit);
   }
 
-  public signals(limit: number): readonly Signal[] {
+  public signals(limit: number, sessionId?: string): readonly Signal[] {
+    this.signalSessionFilters.push(sessionId);
     return this.stateValue.signals.slice(0, limit);
+  }
+
+  public sessions(limit: number): readonly PaperSession[] {
+    return this.stateValue.sessions.slice(0, limit);
   }
 
   public portfolio(): PortfolioSnapshot {

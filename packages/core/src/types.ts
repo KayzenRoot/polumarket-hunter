@@ -7,6 +7,19 @@ export type StrategyAction = 'HOLD' | 'PLACE_BID' | 'PLACE_ASK' | 'TAKE_BUY' | '
 
 export type EngineStatus = 'starting' | 'running' | 'stopped' | 'killed' | 'error';
 
+export type SessionStatus = 'running' | 'stopped' | 'killed' | 'error';
+
+export interface PaperSession {
+  readonly id: string;
+  readonly startedAt: number;
+  readonly endedAt: number | null;
+  readonly status: SessionStatus;
+  readonly mode: TradingMode;
+  readonly startingCash: number;
+  readonly endingEquity: number | null;
+  readonly stopReason: string | null;
+}
+
 export type GeoblockStatus = 'ELIGIBLE' | 'BLOCKED' | 'UNKNOWN';
 
 export interface BookLevel {
@@ -281,6 +294,8 @@ export interface PublicConfig {
 
 export interface StateResponse {
   readonly health: EngineHealth;
+  readonly session: PaperSession | null;
+  readonly sessions: readonly PaperSession[];
   readonly markets: readonly MarketView[];
   readonly portfolio: PortfolioSnapshot;
   readonly trades: readonly Trade[];

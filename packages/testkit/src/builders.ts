@@ -3,6 +3,7 @@ import type {
   Market,
   OrderBook,
   PaperOrder,
+  PaperSession,
   PortfolioSnapshot,
   Position,
   RiskLimits,
@@ -175,6 +176,20 @@ export function makePortfolio(overrides: Partial<PortfolioSnapshot> = {}): Portf
     positions: [],
     openOrders: 0,
     updatedAt: 1_000_000,
+    ...overrides,
+  };
+}
+
+export function makeSession(overrides: Partial<PaperSession> = {}): PaperSession {
+  return {
+    id: 'session-test',
+    startedAt: 1_000_000,
+    endedAt: null,
+    status: 'running',
+    mode: 'paper',
+    startingCash: 1000,
+    endingEquity: null,
+    stopReason: null,
     ...overrides,
   };
 }

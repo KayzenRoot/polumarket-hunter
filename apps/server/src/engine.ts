@@ -12,6 +12,7 @@ import {
   normalizeBook,
   type OrderBook,
   PaperBroker,
+  type PaperSession,
   type PortfolioSnapshot,
   type PublicConfig,
   RiskController,
@@ -99,11 +100,12 @@ export class PolyHunterEngine implements EnginePort {
   private readonly idFactory: (prefix: string) => string;
   private readonly socketFactory: (options: MarketSocketOptions) => MarketStream;
   private readonly recorderFactory: (directory: string, now: number) => BookRecorderLike;
-  private readonly broker: PaperBroker;
+  private broker: PaperBroker;
   private readonly strategy: Strategy;
   private riskController: RiskController;
 
   private status: EngineStatus = 'stopped';
+  private session: PaperSession | null = null;
   private startedAt: number | null = null;
   private lastBookAt: number | null = null;
   private killReason: string | null = null;
@@ -156,20 +158,27 @@ export class PolyHunterEngine implements EnginePort {
     this.recorderFactory =
       deps.recorderFactory ?? ((directory, now) => new BookRecorder(directory, now));
     this.geoblockResult = unknownGeoblock(this.now(), 'not checked');
-    this.broker = new PaperBroker({
-      startingCash: this.config.startingCash,
-      feeBps: this.config.feeBps,
-      now: this.now,
-      idFactory: this.idFactory,
-    });
+    this.broker = this.createBroker();
     this.strategy = createStrategy(this.config.strategy, this.config.strategyConfig);
     this.riskController = new RiskController(this.config.riskLimits, this.config.startingCash);
     this.portfolioSnapshot = this.broker.mark(new Map());
   }
 
+  private createBroker(): PaperBroker {
+    return new PaperBroker({
+      startingCash: this.config.startingCash,
+      feeBps: this.config.feeBps,
+      now: this.now,
+      idFactory: this.idFactory,
+    });
+  }
+
   public async start(): Promise<void> {
     if (this.status === 'running') {
       return;
+    }
+    if (this.status === 'starting') {
+      throw new Error('engine is already starting');
     }
     if (this.status === 'killed') {
       throw new Error('kill switch is active; reset it before starting the engine');
@@ -178,6 +187,22 @@ export class PolyHunterEngine implements EnginePort {
     this.status = 'starting';
     this.startedAt = this.now();
     this.killReason = null;
+    this.broker = this.createBroker();
+    this.portfolioSnapshot = this.broker.mark(new Map());
+    this.decisions.clear();
+    this.lastEntryAt.clear();
+    this.lastRiskDecision = null;
+    this.session = {
+      id: this.idFactory('ses'),
+      startedAt: this.startedAt,
+      endedAt: null,
+      status: 'running',
+      mode: this.config.tradingMode,
+      startingCash: this.config.startingCash,
+      endingEquity: null,
+      stopReason: null,
+    };
+    this.db.insertRun(this.session);
     this.riskController = new RiskController(this.config.riskLimits, this.portfolioSnapshot.equity);
     try {
       if (this.config.tradingMode === 'live') {
@@ -208,11 +233,12 @@ export class PolyHunterEngine implements EnginePort {
       this.status = 'running';
       this.lastSnapshotAt = 0;
       this.updatePortfolio();
-      this.db.insertPortfolioSnapshot(this.portfolioSnapshot);
+      this.db.insertPortfolioSnapshot(this.portfolioSnapshot, this.session.id);
       this.recordEvent('engine_started', 'info', 'paper engine started', {
         mode: this.config.tradingMode,
         markets: this.markets.size,
         demo: this.config.demoMode,
+        sessionId: this.session.id,
       });
       this.emitState();
     } catch (error) {
@@ -220,6 +246,7 @@ export class PolyHunterEngine implements EnginePort {
       this.stream?.close();
       this.stream = null;
       this.scanError = error instanceof Error ? error.message : String(error);
+      this.endSession('error', this.scanError);
       this.recordEvent('engine_start_failed', 'error', this.scanError, null);
       this.emitState();
       throw error;
@@ -233,6 +260,7 @@ export class PolyHunterEngine implements EnginePort {
     this.broker.cancelAll('engine stopped');
     this.status = 'stopped';
     this.updatePortfolio();
+    this.endSession('stopped', 'engine stopped');
     void this.recorder?.close();
     this.recorder = null;
     this.recordEvent('engine_stopped', 'info', 'paper engine stopped', null);
@@ -244,6 +272,22 @@ export class PolyHunterEngine implements EnginePort {
     this.broker.cancelAll('kill switch');
     this.killReason = reason;
     this.status = 'killed';
+    if (this.session !== null) {
+      const next: PaperSession = {
+        ...this.session,
+        status: 'killed',
+        endedAt: this.now(),
+        endingEquity: this.portfolioSnapshot.equity,
+        stopReason: reason,
+      };
+      this.session = next;
+      this.db.updateRun(next.id, {
+        status: next.status,
+        endedAt: next.endedAt,
+        endingEquity: next.endingEquity,
+        stopReason: next.stopReason,
+      });
+    }
     this.recordEvent('kill_switch', 'warn', reason, null);
     this.updatePortfolio();
     this.emitState();
@@ -265,6 +309,22 @@ export class PolyHunterEngine implements EnginePort {
         this.killReason = null;
         if (this.status === 'killed') {
           this.status = 'running';
+          if (this.session !== null) {
+            const next: PaperSession = {
+              ...this.session,
+              status: 'running',
+              endedAt: null,
+              endingEquity: null,
+              stopReason: null,
+            };
+            this.session = next;
+            this.db.updateRun(next.id, {
+              status: next.status,
+              endedAt: next.endedAt,
+              endingEquity: next.endingEquity,
+              stopReason: next.stopReason,
+            });
+          }
         }
         this.recordEvent('kill_switch_reset', 'info', 'kill switch reset', null);
         this.emitState();
@@ -455,17 +515,22 @@ export class PolyHunterEngine implements EnginePort {
     };
   }
 
-  public trades(limit = 100): readonly Trade[] {
-    return this.db.listTrades(Math.max(1, Math.min(limit, 500)));
+  public trades(limit = 100, sessionId?: string): readonly Trade[] {
+    return this.db.listTrades(Math.max(1, Math.min(limit, 500)), sessionId);
   }
 
-  public signals(limit = 50): readonly Signal[] {
-    return this.db.listSignals(Math.max(1, Math.min(limit, 200)));
+  public signals(limit = 50, sessionId?: string): readonly Signal[] {
+    return this.db.listSignals(Math.max(1, Math.min(limit, 200)), sessionId);
+  }
+
+  public sessions(limit = 20): readonly PaperSession[] {
+    return this.db.listRuns(Math.max(1, Math.min(limit, 100)));
   }
 
   public state(): StateResponse {
     this.updatePortfolio();
     const now = this.now();
+    const sessionId = this.session?.id;
     const markets: MarketView[] = [...this.markets.values()]
       .map((market) => {
         const book = this.books.get(market.yesTokenId) ?? null;
@@ -493,20 +558,25 @@ export class PolyHunterEngine implements EnginePort {
 
     return {
       health: this.health(),
+      session: this.session,
+      sessions: this.sessions(20),
       markets,
       portfolio,
-      trades: this.trades(100),
-      signals: this.signals(50),
+      trades: sessionId === undefined ? [] : this.trades(100, sessionId),
+      signals: sessionId === undefined ? [] : this.signals(50, sessionId),
       risk,
       config: this.publicConfig(),
-      equityCurve: this.db
-        .listPortfolioSnapshots(120)
-        .reverse()
-        .map((snapshot) => ({
-          at: snapshot.updatedAt,
-          equity: snapshot.equity,
-          exposure: snapshot.exposure,
-        })),
+      equityCurve:
+        sessionId === undefined
+          ? []
+          : this.db
+              .listPortfolioSnapshots(120, sessionId)
+              .reverse()
+              .map((snapshot) => ({
+                at: snapshot.updatedAt,
+                equity: snapshot.equity,
+                exposure: snapshot.exposure,
+              })),
     };
   }
 
@@ -888,7 +958,7 @@ export class PolyHunterEngine implements EnginePort {
       }
     }
     if (now - this.lastSnapshotAt >= 5000) {
-      this.db.insertPortfolioSnapshot(this.portfolioSnapshot);
+      this.db.insertPortfolioSnapshot(this.portfolioSnapshot, this.session?.id ?? 'legacy');
       this.lastSnapshotAt = now;
     }
     if (!this.config.demoMode && this.stream !== null) {
@@ -937,7 +1007,7 @@ export class PolyHunterEngine implements EnginePort {
       reasons: accepted ? intent.reasons : [...intent.reasons, ...extraReasons],
     };
     try {
-      this.db.insertSignal(signal);
+      this.db.insertSignal(signal, this.session?.id ?? 'legacy');
     } catch (error) {
       this.logger.warn({ err: error }, 'failed to persist signal');
     }
@@ -945,10 +1015,31 @@ export class PolyHunterEngine implements EnginePort {
 
   private persistTrade(trade: Trade): void {
     try {
-      this.db.insertTrade(trade);
+      this.db.insertTrade(trade, this.session?.id ?? 'legacy');
     } catch (error) {
       this.logger.warn({ err: error, tradeId: trade.id }, 'failed to persist trade');
     }
+  }
+
+  private endSession(status: PaperSession['status'], reason: string): void {
+    if (this.session === null) {
+      return;
+    }
+    const now = this.now();
+    const next: PaperSession = {
+      ...this.session,
+      status,
+      endedAt: now,
+      endingEquity: this.portfolioSnapshot.equity,
+      stopReason: reason,
+    };
+    this.session = next;
+    this.db.updateRun(next.id, {
+      status: next.status,
+      endedAt: next.endedAt,
+      endingEquity: next.endingEquity,
+      stopReason: next.stopReason,
+    });
   }
 
   private recordEvent(

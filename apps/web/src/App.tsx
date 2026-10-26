@@ -1,12 +1,14 @@
-import type { StateResponse } from '@polyhunter/core';
+import type { StateResponse, Trade } from '@polyhunter/core';
 import {
   formatCompactUsd,
   formatDuration,
   formatPct,
   formatSignedUsd,
   formatUsd,
+  shortToken,
 } from '@polyhunter/core';
 import { useEffect, useMemo, useState } from 'react';
+import { api } from './api.js';
 import { EquityChart } from './components/EquityChart.js';
 import { AlertIcon, LogoIcon, RefreshIcon } from './components/Icons.js';
 import { KpiCard } from './components/KpiCard.js';
@@ -192,7 +194,35 @@ export default function App() {
   } = useDashboard();
   const [view, setView] = useState<View>('overview');
   const [selectedToken, setSelectedToken] = useState<string | null>(null);
+  const [tradeSessionId, setTradeSessionId] = useState<string>('current');
+  const [sessionLedger, setSessionLedger] = useState<{
+    readonly id: string;
+    readonly trades: readonly Trade[];
+  } | null>(null);
   const detail = useMarketDetail(selectedToken);
+
+  useEffect(() => {
+    if (tradeSessionId === 'current') {
+      setSessionLedger(null);
+      return;
+    }
+    let cancelled = false;
+    void api
+      .trades(100, tradeSessionId)
+      .then((next) => {
+        if (!cancelled) {
+          setSessionLedger({ id: tradeSessionId, trades: next });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSessionLedger({ id: tradeSessionId, trades: [] });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tradeSessionId]);
 
   useEffect(() => {
     if (state === null || selectedToken !== null) {
@@ -228,10 +258,32 @@ export default function App() {
     return <LoadingScreen message="Preparing dashboard…" />;
   }
 
-  const { health, portfolio, risk, markets, trades, signals, config, equityCurve } = state;
+  const {
+    health,
+    portfolio,
+    risk,
+    markets,
+    trades,
+    signals,
+    config,
+    equityCurve,
+    session,
+    sessions,
+  } = state;
   const pnlTone = portfolio.totalPnl >= 0 ? 'positive' : 'negative';
   const exposureRatio =
     risk.limits.maxTotalNotional > 0 ? portfolio.exposure / risk.limits.maxTotalNotional : 0;
+  const displayedTrades =
+    tradeSessionId === 'current'
+      ? trades
+      : sessionLedger !== null && sessionLedger.id === tradeSessionId
+        ? sessionLedger.trades
+        : [];
+  const viewClosed = displayedTrades.filter((trade) => trade.side === 'SELL');
+  const viewWins = viewClosed.filter((trade) => trade.realizedPnl > 0).length;
+  const viewLosses = viewClosed.filter((trade) => trade.realizedPnl < 0).length;
+  const viewRealized = displayedTrades.reduce((sum, trade) => sum + trade.realizedPnl, 0);
+  const viewFees = displayedTrades.reduce((sum, trade) => sum + trade.fee, 0);
   const selectedView =
     markets.find((viewItem) => viewItem.market.yesTokenId === selectedToken) ?? null;
 
@@ -248,6 +300,7 @@ export default function App() {
         health={health}
         equity={portfolio.equity}
         demoMode={config.demoMode}
+        session={session}
       />
       <div className="app-main">
         <TopBar
@@ -465,21 +518,43 @@ export default function App() {
                   <h1>Fills and realized PnL</h1>
                   <p>Every fill is persisted to SQLite with price, size, fee and realized PnL.</p>
                 </div>
+                <div className="page-head-meta">
+                  <label className="select-label">
+                    Session
+                    <select
+                      className="select"
+                      value={tradeSessionId}
+                      onChange={(event) => setTradeSessionId(event.target.value)}
+                      aria-label="Filter trades by session"
+                    >
+                      <option value="current">
+                        Current{session !== null ? ` · ${shortToken(session.id)}` : ''}
+                      </option>
+                      {sessions
+                        .filter((item) => item.id !== session?.id)
+                        .map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {shortToken(item.id)} · {item.status}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                </div>
               </div>
               <div className="kpi-grid kpi-grid-4">
-                <KpiCard label="Fills" value={`${trades.length}`} sub="paper executions" />
+                <KpiCard label="Fills" value={`${displayedTrades.length}`} sub="paper executions" />
                 <KpiCard
                   label="Realized PnL"
-                  value={formatSignedUsd(portfolio.realizedPnl)}
-                  tone={portfolio.realizedPnl >= 0 ? 'positive' : 'negative'}
+                  value={formatSignedUsd(viewRealized)}
+                  tone={viewRealized >= 0 ? 'positive' : 'negative'}
                   sub="net of fees"
                 />
                 <KpiCard
                   label="Win rate"
-                  value={derived.closed.length > 0 ? formatPct(derived.winRate) : '—'}
-                  sub={`${derived.wins}W / ${derived.losses}L`}
+                  value={viewClosed.length > 0 ? formatPct(viewWins / viewClosed.length) : '—'}
+                  sub={`${viewWins}W / ${viewLosses}L`}
                 />
-                <KpiCard label="Fees" value={formatUsd(derived.fees)} sub="configured bps" />
+                <KpiCard label="Fees" value={formatUsd(viewFees)} sub="configured bps" />
               </div>
               <section className="card">
                 <div className="card-head">
@@ -489,7 +564,7 @@ export default function App() {
                   </div>
                   <span className="muted">newest first</span>
                 </div>
-                <TradesTable trades={trades} markets={markets} />
+                <TradesTable trades={displayedTrades} markets={markets} />
               </section>
             </>
           ) : null}

@@ -1,5 +1,12 @@
 import { DatabaseSync } from 'node:sqlite';
-import type { Market, PortfolioSnapshot, Position, Signal, Trade } from '@polyhunter/core';
+import type {
+  Market,
+  PaperSession,
+  PortfolioSnapshot,
+  Position,
+  Signal,
+  Trade,
+} from '@polyhunter/core';
 
 export interface EventRecord {
   readonly at: number;
@@ -77,6 +84,27 @@ function parsePositions(value: SqlValue | undefined): Position[] {
   }
 }
 
+function mapSession(row: Record<string, SqlValue | undefined>): PaperSession {
+  const status = asString(row.status);
+  return {
+    id: asString(row.id),
+    startedAt: asNumber(row.started_at),
+    endedAt: row.ended_at === null || row.ended_at === undefined ? null : asNumber(row.ended_at),
+    status:
+      status === 'running' || status === 'stopped' || status === 'killed' || status === 'error'
+        ? status
+        : 'stopped',
+    mode: asString(row.mode) === 'live' ? 'live' : 'paper',
+    startingCash: asNumber(row.starting_cash),
+    endingEquity:
+      row.ending_equity === null || row.ending_equity === undefined
+        ? null
+        : asNumber(row.ending_equity),
+    stopReason:
+      row.stop_reason === null || row.stop_reason === undefined ? null : asString(row.stop_reason),
+  };
+}
+
 const MIGRATIONS = `
 CREATE TABLE IF NOT EXISTS markets (
   id TEXT PRIMARY KEY,
@@ -98,6 +126,7 @@ CREATE TABLE IF NOT EXISTS markets (
 
 CREATE TABLE IF NOT EXISTS signals (
   id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL DEFAULT 'legacy',
   at INTEGER NOT NULL,
   market_id TEXT NOT NULL,
   token_id TEXT NOT NULL,
@@ -114,6 +143,7 @@ CREATE INDEX IF NOT EXISTS signals_at_idx ON signals (at DESC);
 
 CREATE TABLE IF NOT EXISTS trades (
   id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL DEFAULT 'legacy',
   at INTEGER NOT NULL,
   market_id TEXT NOT NULL,
   token_id TEXT NOT NULL,
@@ -131,6 +161,7 @@ CREATE INDEX IF NOT EXISTS trades_at_idx ON trades (at DESC);
 
 CREATE TABLE IF NOT EXISTS portfolio_snapshots (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL DEFAULT 'legacy',
   at INTEGER NOT NULL,
   starting_cash REAL NOT NULL,
   cash REAL NOT NULL,
@@ -144,6 +175,18 @@ CREATE TABLE IF NOT EXISTS portfolio_snapshots (
   open_orders INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS portfolio_at_idx ON portfolio_snapshots (at DESC);
+
+CREATE TABLE IF NOT EXISTS runs (
+  id TEXT PRIMARY KEY,
+  started_at INTEGER NOT NULL,
+  ended_at INTEGER,
+  status TEXT NOT NULL,
+  mode TEXT NOT NULL,
+  starting_cash REAL NOT NULL,
+  ending_equity REAL,
+  stop_reason TEXT
+);
+CREATE INDEX IF NOT EXISTS runs_started_idx ON runs (started_at DESC);
 
 CREATE TABLE IF NOT EXISTS events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -164,6 +207,21 @@ export class PolyHunterDb {
     this.db.exec('PRAGMA journal_mode = WAL;');
     this.db.exec('PRAGMA foreign_keys = ON;');
     this.db.exec(MIGRATIONS);
+    this.ensureColumn('signals', 'session_id', "TEXT NOT NULL DEFAULT 'legacy'");
+    this.ensureColumn('trades', 'session_id', "TEXT NOT NULL DEFAULT 'legacy'");
+    this.ensureColumn('portfolio_snapshots', 'session_id', "TEXT NOT NULL DEFAULT 'legacy'");
+    this.db.exec(
+      'CREATE INDEX IF NOT EXISTS signals_session_idx ON signals (session_id, at DESC);' +
+        'CREATE INDEX IF NOT EXISTS trades_session_idx ON trades (session_id, at DESC);' +
+        'CREATE INDEX IF NOT EXISTS portfolio_session_idx ON portfolio_snapshots (session_id, at DESC);',
+    );
+  }
+
+  private ensureColumn(table: string, column: string, definition: string): void {
+    const rows = this.db.prepare(`PRAGMA table_info(${table})`).all();
+    if (!rows.some((row) => asString(row.name) === column)) {
+      this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
   }
 
   public static inMemory(): PolyHunterDb {
@@ -244,16 +302,17 @@ export class PolyHunterDb {
     }));
   }
 
-  public insertSignal(signal: Signal): void {
+  public insertSignal(signal: Signal, sessionId = 'legacy'): void {
     this.db
       .prepare(
         `INSERT OR REPLACE INTO signals (
-          id, at, market_id, token_id, outcome, action, fair_value, market_price,
+          id, session_id, at, market_id, token_id, outcome, action, fair_value, market_price,
           edge, confidence, accepted, reasons
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         signal.id,
+        sessionId,
         signal.at,
         signal.marketId,
         signal.tokenId,
@@ -268,14 +327,15 @@ export class PolyHunterDb {
       );
   }
 
-  public listSignals(limit = 100): Signal[] {
-    const rows = this.db
-      .prepare(
-        `SELECT id, at, market_id, token_id, outcome, action, fair_value,
-          market_price, edge, confidence, accepted, reasons
-        FROM signals ORDER BY at DESC LIMIT ?`,
-      )
-      .all(limit);
+  public listSignals(limit = 100, sessionId?: string): Signal[] {
+    const columns = `SELECT id, at, market_id, token_id, outcome, action, fair_value,
+      market_price, edge, confidence, accepted, reasons FROM signals`;
+    const rows =
+      sessionId === undefined
+        ? this.db.prepare(`${columns} ORDER BY at DESC LIMIT ?`).all(limit)
+        : this.db
+            .prepare(`${columns} WHERE session_id = ? ORDER BY at DESC LIMIT ?`)
+            .all(sessionId, limit);
 
     return rows.map((row) => ({
       id: asString(row.id),
@@ -293,16 +353,17 @@ export class PolyHunterDb {
     }));
   }
 
-  public insertTrade(trade: Trade): void {
+  public insertTrade(trade: Trade, sessionId = 'legacy'): void {
     this.db
       .prepare(
         `INSERT OR REPLACE INTO trades (
-          id, at, market_id, token_id, outcome, side, price, size, notional,
+          id, session_id, at, market_id, token_id, outcome, side, price, size, notional,
           fee, realized_pnl, order_id, mode
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         trade.id,
+        sessionId,
         trade.at,
         trade.marketId,
         trade.tokenId,
@@ -318,14 +379,15 @@ export class PolyHunterDb {
       );
   }
 
-  public listTrades(limit = 100): Trade[] {
-    const rows = this.db
-      .prepare(
-        `SELECT id, at, market_id, token_id, outcome, side, price, size, notional,
-          fee, realized_pnl, order_id, mode
-        FROM trades ORDER BY at DESC LIMIT ?`,
-      )
-      .all(limit);
+  public listTrades(limit = 100, sessionId?: string): Trade[] {
+    const columns = `SELECT id, at, market_id, token_id, outcome, side, price, size, notional,
+      fee, realized_pnl, order_id, mode FROM trades`;
+    const rows =
+      sessionId === undefined
+        ? this.db.prepare(`${columns} ORDER BY at DESC LIMIT ?`).all(limit)
+        : this.db
+            .prepare(`${columns} WHERE session_id = ? ORDER BY at DESC LIMIT ?`)
+            .all(sessionId, limit);
 
     return rows.map((row) => ({
       id: asString(row.id),
@@ -344,15 +406,16 @@ export class PolyHunterDb {
     }));
   }
 
-  public insertPortfolioSnapshot(snapshot: PortfolioSnapshot): void {
+  public insertPortfolioSnapshot(snapshot: PortfolioSnapshot, sessionId = 'legacy'): void {
     this.db
       .prepare(
         `INSERT INTO portfolio_snapshots (
-          at, starting_cash, cash, reserved_cash, equity, exposure, realized_pnl,
+          session_id, at, starting_cash, cash, reserved_cash, equity, exposure, realized_pnl,
           unrealized_pnl, total_pnl, positions, open_orders
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
+        sessionId,
         snapshot.updatedAt,
         snapshot.startingCash,
         snapshot.cash,
@@ -367,14 +430,15 @@ export class PolyHunterDb {
       );
   }
 
-  public listPortfolioSnapshots(limit = 500): PortfolioSnapshot[] {
-    const rows = this.db
-      .prepare(
-        `SELECT at, starting_cash, cash, reserved_cash, equity, exposure,
-          realized_pnl, unrealized_pnl, total_pnl, positions, open_orders
-        FROM portfolio_snapshots ORDER BY at DESC LIMIT ?`,
-      )
-      .all(limit);
+  public listPortfolioSnapshots(limit = 500, sessionId?: string): PortfolioSnapshot[] {
+    const columns = `SELECT at, starting_cash, cash, reserved_cash, equity, exposure,
+      realized_pnl, unrealized_pnl, total_pnl, positions, open_orders FROM portfolio_snapshots`;
+    const rows =
+      sessionId === undefined
+        ? this.db.prepare(`${columns} ORDER BY at DESC LIMIT ?`).all(limit)
+        : this.db
+            .prepare(`${columns} WHERE session_id = ? ORDER BY at DESC LIMIT ?`)
+            .all(sessionId, limit);
 
     return rows.map((row) => ({
       startingCash: asNumber(row.starting_cash),
@@ -389,6 +453,51 @@ export class PolyHunterDb {
       openOrders: asNumber(row.open_orders),
       updatedAt: asNumber(row.at),
     }));
+  }
+
+  public insertRun(session: PaperSession): void {
+    this.db
+      .prepare(
+        `INSERT OR REPLACE INTO runs (
+          id, started_at, ended_at, status, mode, starting_cash, ending_equity, stop_reason
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        session.id,
+        session.startedAt,
+        session.endedAt,
+        session.status,
+        session.mode,
+        session.startingCash,
+        session.endingEquity,
+        session.stopReason,
+      );
+  }
+
+  public updateRun(
+    id: string,
+    patch: Partial<Pick<PaperSession, 'endedAt' | 'status' | 'endingEquity' | 'stopReason'>>,
+  ): void {
+    const current = this.getRun(id);
+    if (current === null) {
+      return;
+    }
+    const next: PaperSession = { ...current, ...patch };
+    this.db
+      .prepare(
+        `UPDATE runs SET ended_at = ?, status = ?, ending_equity = ?, stop_reason = ? WHERE id = ?`,
+      )
+      .run(next.endedAt, next.status, next.endingEquity, next.stopReason, id);
+  }
+
+  public getRun(id: string): PaperSession | null {
+    const row = this.db.prepare(`SELECT * FROM runs WHERE id = ?`).get(id);
+    return row === undefined ? null : mapSession(row);
+  }
+
+  public listRuns(limit = 20): PaperSession[] {
+    const rows = this.db.prepare(`SELECT * FROM runs ORDER BY started_at DESC LIMIT ?`).all(limit);
+    return rows.map(mapSession);
   }
 
   public insertEvent(event: EventRecord): void {

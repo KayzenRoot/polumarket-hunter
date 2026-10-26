@@ -1,5 +1,5 @@
-import type { EngineHealth } from '@polyhunter/core';
-import { formatUsd } from '@polyhunter/core';
+import type { EngineHealth, PaperSession } from '@polyhunter/core';
+import { formatUsd, shortToken } from '@polyhunter/core';
 import { MarketsIcon, OverviewIcon, RiskIcon, TradesIcon } from './Icons.js';
 import { StatusPill } from './StatusPill.js';
 
@@ -11,6 +11,7 @@ interface SidebarProps {
   readonly health: EngineHealth;
   readonly equity: number;
   readonly demoMode: boolean;
+  readonly session: PaperSession | null;
 }
 
 const ITEMS: readonly { id: View; label: string; icon: typeof OverviewIcon }[] = [
@@ -20,7 +21,7 @@ const ITEMS: readonly { id: View; label: string; icon: typeof OverviewIcon }[] =
   { id: 'risk', label: 'Risk', icon: RiskIcon },
 ];
 
-export function Sidebar({ view, onChange, health, equity, demoMode }: SidebarProps) {
+export function Sidebar({ view, onChange, health, equity, demoMode, session }: SidebarProps) {
   return (
     <aside className="sidebar">
       <nav className="sidebar-nav" aria-label="Primary">
@@ -47,6 +48,9 @@ export function Sidebar({ view, onChange, health, equity, demoMode }: SidebarPro
         <span className="sidebar-label">Session</span>
         <div className="session-equity">{formatUsd(equity)}</div>
         <div className="session-caption">paper equity</div>
+        {session !== null ? (
+          <div className="session-caption">session {shortToken(session.id)}</div>
+        ) : null}
         <div className="session-pills">
           <StatusPill
             tone={

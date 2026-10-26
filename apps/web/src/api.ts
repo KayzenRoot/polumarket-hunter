@@ -1,4 +1,12 @@
-import type { ApiResponse, ControlRequest, MarketDetail, StateResponse } from '@polyhunter/core';
+import type {
+  ApiResponse,
+  ControlRequest,
+  MarketDetail,
+  PaperSession,
+  Signal,
+  StateResponse,
+  Trade,
+} from '@polyhunter/core';
 
 const TOKEN_KEY = 'polyhunter.apiToken';
 
@@ -61,6 +69,22 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   state: (): Promise<StateResponse> => request<StateResponse>('/api/state'),
+  sessions: (): Promise<readonly PaperSession[]> =>
+    request<readonly PaperSession[]>('/api/sessions'),
+  trades: (limit = 100, sessionId?: string): Promise<readonly Trade[]> => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (sessionId !== undefined) {
+      params.set('session', sessionId);
+    }
+    return request<readonly Trade[]>(`/api/trades?${params.toString()}`);
+  },
+  signals: (limit = 50, sessionId?: string): Promise<readonly Signal[]> => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (sessionId !== undefined) {
+      params.set('session', sessionId);
+    }
+    return request<readonly Signal[]>(`/api/signals?${params.toString()}`);
+  },
   marketDetail: (tokenId: string): Promise<MarketDetail> =>
     request<MarketDetail>(`/api/markets/${encodeURIComponent(tokenId)}`),
   control: (action: ControlRequest['action']): Promise<StateResponse> =>

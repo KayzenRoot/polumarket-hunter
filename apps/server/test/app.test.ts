@@ -74,6 +74,39 @@ describe('http api', () => {
     expect(risk.statusCode).toBe(200);
   });
 
+  it('serves sessions and forwards session filters', async () => {
+    const { app, engine } = await build();
+    const sessions = await app.inject({ method: 'GET', url: '/api/sessions' });
+    expect(sessions.statusCode).toBe(200);
+    const body = sessions.json() as { data: { id: string }[] };
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0]?.id).toBe('session-test');
+
+    const trades = await app.inject({
+      method: 'GET',
+      url: '/api/trades?limit=5&session=session-previous',
+    });
+    expect(trades.statusCode).toBe(200);
+    expect(engine.tradeSessionFilters).toContain('session-previous');
+
+    const signals = await app.inject({
+      method: 'GET',
+      url: '/api/signals?limit=5&session=session-previous',
+    });
+    expect(signals.statusCode).toBe(200);
+    expect(engine.signalSessionFilters).toContain('session-previous');
+
+    const unfiltered = await app.inject({ method: 'GET', url: '/api/trades?limit=5' });
+    expect(unfiltered.statusCode).toBe(200);
+    expect(engine.tradeSessionFilters).toContain(undefined);
+  });
+
+  it('rejects an empty session filter', async () => {
+    const { app } = await build();
+    const response = await app.inject({ method: 'GET', url: '/api/trades?session=' });
+    expect(response.statusCode).toBe(400);
+  });
+
   it('returns a market detail and a JSON 404 for an unknown token', async () => {
     const { app } = await build();
     const found = await app.inject({ method: 'GET', url: '/api/markets/yes-token' });
