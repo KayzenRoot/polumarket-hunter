@@ -6,18 +6,13 @@ import {
   DEFAULT_STRATEGY_CONFIG,
   decodeRecording,
   formatBacktestReport,
+  formatValidationReport,
   runBacktest,
   type StrategyConfig,
   type StrategyKind,
+  validateRecording,
 } from '../packages/core/src/index.js';
-
-function numberOption(value: string | boolean | undefined, fallback: number): number {
-  if (typeof value !== 'string') {
-    return fallback;
-  }
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
+import { numberOption } from './args.js';
 
 function strategyOption(value: string | boolean | undefined): StrategyKind {
   return value === 'micro-maker' ? 'micro-maker' : 'momentum-taker';
@@ -46,16 +41,17 @@ if (typeof values.file !== 'string') {
 }
 
 const recording = decodeRecording(readFileSync(values.file, 'utf8'));
-if (recording.errors.length > 0) {
-  console.error(`Recording has ${recording.errors.length} invalid line(s):`);
-  for (const error of recording.errors.slice(0, 10)) {
-    console.error(`  ${error}`);
-  }
+const validation = validateRecording(recording);
+if (!validation.ok) {
+  console.error('Recording failed validation; refusing to backtest.');
+  console.error(formatValidationReport(validation));
   process.exit(1);
 }
-if (recording.books.length === 0) {
-  console.error('Recording has no valid books.');
-  process.exit(1);
+if (validation.warnings.length > 0) {
+  console.warn(`Recording validation warnings (${validation.warnings.length}):`);
+  for (const warning of validation.warnings) {
+    console.warn(`  - ${warning}`);
+  }
 }
 
 const strategyKind = strategyOption(values.strategy);

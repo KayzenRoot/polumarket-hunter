@@ -37,4 +37,16 @@ describe('recording format', () => {
     expect(result.books).toHaveLength(2);
     expect(result.errors).toEqual(['line 2: invalid book recording']);
   });
+
+  it('warns when normalization drops an out-of-range level', () => {
+    const book = makeBook();
+    const text = `${JSON.stringify({
+      v: 1,
+      type: 'book',
+      book: { ...book, bids: [{ price: 1.2, size: 100 }] },
+    })}\n`;
+    const result = decodeRecording(text);
+    expect(result.books).toHaveLength(1);
+    expect(result.warnings.join(' ')).toContain('bids[0] price 1.2 is outside (0, 1)');
+  });
 });

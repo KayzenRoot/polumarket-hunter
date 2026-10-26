@@ -33,6 +33,7 @@
     "ci": "npm run lint && npm run typecheck && npm run test:coverage && npm run build",
     "smoke": "tsx --tsconfig tsconfig.dev.json scripts/smoke.ts",
     "record": "tsx --tsconfig tsconfig.dev.json scripts/record.ts",
+    "data:validate": "tsx --tsconfig tsconfig.dev.json scripts/validate.ts",
     "backtest": "tsx --tsconfig tsconfig.dev.json scripts/backtest.ts",
     "demo": "tsx --tsconfig tsconfig.dev.json scripts/demo.ts",
     "ecc:sync": "node scripts/sync-ecc.mjs"

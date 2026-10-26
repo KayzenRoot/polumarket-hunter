@@ -9,14 +9,7 @@ import {
   type StrategyConfig,
   type StrategyKind,
 } from '../packages/core/src/index.js';
-
-function numberOption(value: string | boolean | undefined, fallback: number): number {
-  if (typeof value !== 'string') {
-    return fallback;
-  }
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
+import { numberOption } from './args.js';
 
 function strategyOption(value: string | boolean | undefined): StrategyKind {
   return value === 'micro-maker' ? 'micro-maker' : 'momentum-taker';
