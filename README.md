@@ -149,6 +149,7 @@ Risk controls are fail-closed. See [docs/STRATEGY.md](docs/STRATEGY.md) and
 | `npm run db:restore -- --file <backup>`  | Restore a verified backup (requires `--yes`)    |
 | `npm run db:prune -- --dry-run`          | Preview age/session retention cleanup           |
 | `npm run data:export -- --session <id>`  | Export session trades/signals to CSV            |
+| `docker compose up --build`              | Reproducible container runtime (needs token)    |
 | `npm run ecc:sync`                       | Refresh curated ECC skills/rules                |
 
 ## Recording and replay

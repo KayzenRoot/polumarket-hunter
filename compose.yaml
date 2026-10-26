@@ -1,0 +1,26 @@
+services:
+  polyhunter:
+    build: .
+    image: polyhunter:local
+    ports:
+      - '8787:8787'
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8787
+      NODE_ENV: production
+      TRADING_MODE: paper
+      DEMO_MODE: ${DEMO_MODE:-false}
+      API_TOKEN: ${POLYHUNTER_API_TOKEN:?set POLYHUNTER_API_TOKEN to a long random value}
+      DATABASE_PATH: /data/polyhunter.db
+      RECORD_DIR: /data/recordings
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - polyhunter-data:/data
+    tmpfs:
+      - /tmp
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 20s
+
+volumes:
+  polyhunter-data:
