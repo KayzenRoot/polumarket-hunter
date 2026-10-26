@@ -63,8 +63,13 @@ jobs:
           tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner \
             --use-compress-program='gzip -9n' \
             -cf "$ARTIFACT" \
-            package.json package-lock.json README.md .env.example docs \
-            node_modules packages apps/server/package.json apps/server/dist apps/web/dist
+            package.json package-lock.json README.md LICENSE .env.example docs \
+            node_modules \
+            packages/core/package.json packages/core/dist \
+            packages/polymarket/package.json packages/polymarket/dist \
+            packages/persistence/package.json packages/persistence/dist \
+            packages/testkit/package.json packages/testkit/dist \
+            apps/server/package.json apps/server/dist apps/web/dist
           sha256sum "$ARTIFACT" sbom.cdx.json > SHA256SUMS
           sha256sum -c SHA256SUMS
 
