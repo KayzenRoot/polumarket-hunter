@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { errorMessage, sleep } from '../src/http.js';
+import { errorMessage, sleep, trimTrailingSlashes } from '../src/http.js';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -10,6 +10,14 @@ describe('http helpers', () => {
     expect(errorMessage(new Error('boom'))).toBe('boom');
     expect(errorMessage('plain')).toBe('plain');
     expect(errorMessage(42)).toBe('42');
+  });
+
+  it('trims trailing slashes without a backtracking regex', () => {
+    expect(trimTrailingSlashes('https://example.test')).toBe('https://example.test');
+    expect(trimTrailingSlashes('https://example.test/')).toBe('https://example.test');
+    expect(trimTrailingSlashes('https://example.test////')).toBe('https://example.test');
+    expect(trimTrailingSlashes('/')).toBe('');
+    expect(trimTrailingSlashes('')).toBe('');
   });
 
   it('sleeps for the requested duration', async () => {

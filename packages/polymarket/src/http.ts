@@ -25,6 +25,14 @@ export function sleep(ms: number): Promise<void> {
   });
 }
 
+export function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) {
+    end -= 1;
+  }
+  return value.slice(0, end);
+}
+
 export function errorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
