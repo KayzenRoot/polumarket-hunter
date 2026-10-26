@@ -1367,6 +1367,19 @@ button:disabled {
   font-weight: 630;
 }
 
+.risk-kill-reason {
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 107, 107, 0.5);
+  border-radius: 7px;
+  background: var(--red-soft);
+  color: var(--red);
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .meter-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -77,6 +77,24 @@ describe('server configuration', () => {
     expect(config.liveAuthorized).toBe(true);
   });
 
+  it('loads feed watchdog and webhook settings', () => {
+    const config = loadConfig({
+      NODE_ENV: 'test',
+      FEED_STALE_MS: '15000',
+      ALERT_WEBHOOK_URL: 'https://alerts.example.test/polyhunter',
+    });
+    expect(config.feedStaleMs).toBe(15_000);
+    expect(config.alertWebhookUrl).toBe('https://alerts.example.test/polyhunter');
+
+    const defaults = loadConfig({ NODE_ENV: 'test' });
+    expect(defaults.feedStaleMs).toBe(60_000);
+    expect(defaults.alertWebhookUrl).toBeNull();
+
+    expect(() =>
+      loadConfig({ NODE_ENV: 'test', ALERT_WEBHOOK_URL: 'ftp://alerts.example.test' }),
+    ).toThrow(/invalid PolyHunter configuration/);
+  });
+
   it('keeps strategy and risk spread limits aligned', () => {
     const config = loadConfig({ NODE_ENV: 'test', MAX_SPREAD: '0.02', BOOK_STALE_MS: '3000' });
     expect(config.strategyConfig.maxSpread).toBe(0.02);

@@ -1,4 +1,4 @@
-import type { Market } from '@polyhunter/core';
+﻿import type { Market } from '@polyhunter/core';
 import { PolyHunterDb } from '@polyhunter/persistence';
 import {
   type BookFetchResult,
@@ -10,7 +10,12 @@ import { makeBook, makeClock } from '@polyhunter/testkit';
 import type { Logger } from 'pino';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../src/config.js';
-import { type MarketStream, PolyHunterEngine } from '../src/engine.js';
+import {
+  type EngineAlert,
+  type EngineDeps,
+  type MarketStream,
+  PolyHunterEngine,
+} from '../src/engine.js';
 import { createLogger } from '../src/logger.js';
 
 interface Harness {
@@ -23,7 +28,10 @@ interface Harness {
 const engines: PolyHunterEngine[] = [];
 const databases: PolyHunterDb[] = [];
 
-function harness(overrides: Record<string, string> = {}): Harness {
+function harness(
+  overrides: Record<string, string> = {},
+  deps: { alertSink?: EngineDeps['alertSink'] } = {},
+): Harness {
   const config = loadConfig({
     NODE_ENV: 'test',
     LOG_LEVEL: 'silent',
@@ -65,6 +73,7 @@ function harness(overrides: Record<string, string> = {}): Harness {
       counter += 1;
       return `${prefix}_test_${counter}`;
     },
+    ...(deps.alertSink === undefined ? {} : { alertSink: deps.alertSink }),
   });
   engines.push(engine);
   databases.push(db);
@@ -116,19 +125,28 @@ function liveHarness(
   options: {
     readonly books?: readonly BookFetchResult[];
     readonly stream?: Partial<MarketStream>;
+    readonly env?: Readonly<Record<string, string>>;
+    readonly alertSink?: EngineDeps['alertSink'];
   } = {},
-): { engine: PolyHunterEngine; db: PolyHunterDb; opened: string[] } {
+): {
+  engine: PolyHunterEngine;
+  db: PolyHunterDb;
+  opened: string[];
+  clock: ReturnType<typeof makeClock>;
+} {
   const config = loadConfig({
     NODE_ENV: 'test',
     LOG_LEVEL: 'silent',
     DEMO_MODE: 'false',
     DATABASE_PATH: ':memory:',
     MAX_MARKETS: '2',
+    ...options.env,
   });
   const db = PolyHunterDb.inMemory();
   databases.push(db);
   const logger = createLogger({ ...config, logLevel: 'silent' });
   const opened: string[] = [];
+  const clock = makeClock(1_000_000);
   const engine = new PolyHunterEngine({
     config,
     db,
@@ -157,10 +175,11 @@ function liveHarness(
       lastError: null,
       ...options.stream,
     }),
-    now: () => 1_000_000,
+    now: clock.now,
+    ...(options.alertSink === undefined ? {} : { alertSink: options.alertSink }),
   });
   engines.push(engine);
-  return { engine, db, opened };
+  return { engine, db, opened, clock };
 }
 
 function liveRefusalHarness(geoblock: GeoblockResult): {
@@ -342,6 +361,117 @@ describe('paper engine', () => {
     expect(signals[0]?.accepted).toBe(false);
     expect(signals[0]?.reasons.join(' ')).toContain('market-notional');
     expect(engine.state().portfolio.openOrders).toBe(0);
+  });
+
+  it('auto-kills on the daily loss limit and cancels resting orders', async () => {
+    const alerts: EngineAlert[] = [];
+    const { engine, clock, db } = harness(
+      {
+        MAX_DAILY_LOSS: '1',
+        MAX_DRAWDOWN_PCT: '1',
+        ORDER_NOTIONAL: '20',
+        MAX_NOTIONAL_PER_MARKET: '25',
+      },
+      {
+        alertSink: (alert) => {
+          alerts.push(alert);
+        },
+      },
+    );
+    await engine.start();
+    engine.ingestBook(quoteBook(clock.now()));
+    clock.advance(1000);
+    engine.ingestBook(crossingBook(clock.now()));
+    expect(engine.health().status).toBe('running');
+
+    clock.advance(1000);
+    engine.ingestBook(
+      makeBook({
+        tokenId: 'demo-yes-fed',
+        marketId: 'demo-fed',
+        outcome: 'YES',
+        timestamp: clock.now(),
+        bids: [{ price: 0.3, size: 300 }],
+        asks: [{ price: 0.32, size: 300 }],
+      }),
+    );
+
+    expect(engine.health().status).toBe('killed');
+    expect(engine.health().killReason).toContain('daily loss limit');
+    expect(engine.state().risk.killSwitch).toBe(true);
+    expect(engine.state().portfolio.openOrders).toBe(0);
+    expect(engine.state().session?.status).toBe('killed');
+    expect(alerts[0]).toMatchObject({ kind: 'auto-kill', mode: 'paper' });
+    expect(db.listEvents().map((event) => event.kind)).toContain('auto_kill');
+    await expect(engine.start()).rejects.toThrow(/kill switch is active/);
+
+    engine.stop();
+    await expect(engine.start()).rejects.toThrow(/kill switch is active/);
+    await engine.control('reset-kill');
+    await engine.start();
+    expect(engine.health().status).toBe('running');
+  });
+
+  it('auto-kills on the drawdown limit', async () => {
+    const { engine, clock } = harness({
+      MAX_DAILY_LOSS: '1000',
+      MAX_DRAWDOWN_PCT: '0.01',
+      ORDER_NOTIONAL: '20',
+      MAX_NOTIONAL_PER_MARKET: '25',
+    });
+    await engine.start();
+    engine.ingestBook(quoteBook(clock.now()));
+    clock.advance(1000);
+    engine.ingestBook(crossingBook(clock.now()));
+    clock.advance(1000);
+    engine.ingestBook(
+      makeBook({
+        tokenId: 'demo-yes-fed',
+        marketId: 'demo-fed',
+        outcome: 'YES',
+        timestamp: clock.now(),
+        bids: [{ price: 0.2, size: 300 }],
+        asks: [{ price: 0.22, size: 300 }],
+      }),
+    );
+
+    expect(engine.health().status).toBe('killed');
+    expect(engine.health().killReason).toContain('drawdown limit');
+  });
+
+  it('auto-kills on a stale feed and recovers only after reset-kill', async () => {
+    const alerts: EngineAlert[] = [];
+    const { engine, clock } = liveHarness({
+      books: [],
+      env: { FEED_STALE_MS: '1000' },
+      alertSink: (alert) => {
+        alerts.push(alert);
+      },
+    });
+    await engine.start();
+    expect(engine.health().lastBookAt).toBeNull();
+
+    clock.advance(2000);
+    vi.advanceTimersByTime(1000);
+    expect(engine.health().status).toBe('killed');
+    expect(engine.health().killReason).toContain('stale feed');
+    expect(alerts[0]).toMatchObject({ kind: 'auto-kill', mode: 'paper' });
+    await expect(engine.start()).rejects.toThrow(/kill switch is active/);
+
+    await engine.control('reset-kill');
+    expect(engine.health().status).toBe('running');
+    engine.ingestBook(
+      makeBook({
+        tokenId: 'yes-token',
+        marketId: 'market-1',
+        outcome: 'YES',
+        timestamp: clock.now(),
+        bids: [{ price: 0.48, size: 300 }],
+        asks: [{ price: 0.5, size: 300 }],
+      }),
+    );
+    vi.advanceTimersByTime(1000);
+    expect(engine.health().status).toBe('running');
   });
 
   it('stops, kills and resets the kill switch', async () => {

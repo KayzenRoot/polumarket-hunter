@@ -42,8 +42,10 @@ test.describe('PolyHunter dashboard', () => {
     });
     await page.getByRole('button', { name: 'Kill' }).click();
     await expect(page.getByText('KILL SWITCH ON')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/operator kill switch/)).toBeVisible();
 
     await page.getByRole('button', { name: 'Reset kill' }).click();
     await expect(page.getByText('ARMED')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/operator kill switch/)).toHaveCount(0);
   });
 });

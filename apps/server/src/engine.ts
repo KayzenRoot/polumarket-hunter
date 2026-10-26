@@ -54,6 +54,14 @@ export interface MarketStream {
   readonly lastError: string | null;
 }
 
+export interface EngineAlert {
+  readonly kind: 'operator-kill' | 'auto-kill';
+  readonly reason: string;
+  readonly at: number;
+  readonly mode: 'paper' | 'live';
+  readonly sessionId: string | null;
+}
+
 export interface EngineDeps {
   readonly config: AppConfig;
   readonly db: PolyHunterDb;
@@ -73,6 +81,7 @@ export interface EngineDeps {
     current(): GeoblockResult | null;
   };
   readonly socketFactory?: (options: MarketSocketOptions) => MarketStream;
+  readonly alertSink?: (alert: EngineAlert) => void | Promise<void>;
   readonly now?: () => number;
   readonly idFactory?: (prefix: string) => string;
   readonly recorderFactory?: (directory: string, now: number) => BookRecorderLike;
@@ -101,6 +110,7 @@ export class PolyHunterEngine implements EnginePort {
   private readonly idFactory: (prefix: string) => string;
   private readonly socketFactory: (options: MarketSocketOptions) => MarketStream;
   private readonly recorderFactory: (directory: string, now: number) => BookRecorderLike;
+  private readonly alertSink: (alert: EngineAlert) => void | Promise<void>;
   private broker: PaperBroker;
   private readonly strategy: Strategy;
   private riskController: RiskController;
@@ -133,6 +143,7 @@ export class PolyHunterEngine implements EnginePort {
   private scanTimer: ReturnType<typeof setInterval> | null = null;
   private markTimer: ReturnType<typeof setInterval> | null = null;
   private demoTimer: ReturnType<typeof setInterval> | null = null;
+  private feedTimer: ReturnType<typeof setInterval> | null = null;
   private lastSnapshotAt = 0;
 
   private demoStep = 0;
@@ -158,6 +169,7 @@ export class PolyHunterEngine implements EnginePort {
       deps.socketFactory ?? ((options: MarketSocketOptions) => new MarketSocket(options));
     this.recorderFactory =
       deps.recorderFactory ?? ((directory, now) => new BookRecorder(directory, now));
+    this.alertSink = deps.alertSink ?? (() => undefined);
     this.geoblockResult = unknownGeoblock(this.now(), 'not checked');
     this.broker = this.createBroker();
     this.strategy = createStrategy(this.config.strategy, this.config.strategyConfig);
@@ -191,7 +203,7 @@ export class PolyHunterEngine implements EnginePort {
     if (this.status === 'starting') {
       throw new Error('engine is already starting');
     }
-    if (this.status === 'killed') {
+    if (this.status === 'killed' || this.killReason !== null) {
       throw new Error('kill switch is active; reset it before starting the engine');
     }
 
@@ -265,20 +277,29 @@ export class PolyHunterEngine implements EnginePort {
   }
 
   public stop(): void {
+    const wasKilled = this.status === 'killed';
+    const killReason = this.killReason;
     this.stopTimers();
     this.stream?.close();
     this.stream = null;
     this.broker.cancelAll('engine stopped');
     this.status = 'stopped';
     this.updatePortfolio();
-    this.endSession('stopped', 'engine stopped');
+    this.endSession(
+      wasKilled ? 'killed' : 'stopped',
+      wasKilled ? (killReason ?? 'engine stopped after kill') : 'engine stopped',
+    );
     void this.recorder?.close();
     this.recorder = null;
     this.recordEvent('engine_stopped', 'info', 'paper engine stopped', null);
     this.emitState();
   }
 
-  public kill(reason: string): void {
+  public kill(reason: string, source: 'operator' | 'auto' = 'operator'): void {
+    if (this.status === 'killed') {
+      return;
+    }
+    const at = this.now();
     this.riskController.kill(reason);
     this.broker.cancelAll('kill switch');
     this.killReason = reason;
@@ -287,7 +308,7 @@ export class PolyHunterEngine implements EnginePort {
       const next: PaperSession = {
         ...this.session,
         status: 'killed',
-        endedAt: this.now(),
+        endedAt: at,
         endingEquity: this.portfolioSnapshot.equity,
         stopReason: reason,
       };
@@ -299,7 +320,19 @@ export class PolyHunterEngine implements EnginePort {
         stopReason: next.stopReason,
       });
     }
-    this.recordEvent('kill_switch', 'warn', reason, null);
+    this.recordEvent(
+      source === 'auto' ? 'auto_kill' : 'kill_switch',
+      source === 'auto' ? 'error' : 'warn',
+      reason,
+      { source },
+    );
+    this.emitAlert({
+      kind: source === 'auto' ? 'auto-kill' : 'operator-kill',
+      reason,
+      at,
+      mode: this.config.tradingMode,
+      sessionId: this.session?.id ?? null,
+    });
     this.updatePortfolio();
     this.emitState();
   }
@@ -932,6 +965,12 @@ export class PolyHunterEngine implements EnginePort {
     this.markTimer = setInterval(() => {
       this.tick();
     }, 1000);
+    this.feedTimer = setInterval(
+      () => {
+        this.checkFeedFreshness();
+      },
+      Math.max(1000, Math.min(5000, Math.floor(this.config.feedStaleMs / 2))),
+    );
     if (this.config.demoMode) {
       this.demoTimer = setInterval(() => {
         this.demoTick();
@@ -947,6 +986,10 @@ export class PolyHunterEngine implements EnginePort {
     if (this.markTimer !== null) {
       clearInterval(this.markTimer);
       this.markTimer = null;
+    }
+    if (this.feedTimer !== null) {
+      clearInterval(this.feedTimer);
+      this.feedTimer = null;
     }
     if (this.demoTimer !== null) {
       clearInterval(this.demoTimer);
@@ -1002,6 +1045,12 @@ export class PolyHunterEngine implements EnginePort {
       this.portfolioSnapshot.equity,
       this.portfolioSnapshot.totalPnl,
     );
+    if (this.status === 'running') {
+      const autoKillReason = this.riskController.autoKillReason(this.portfolioSnapshot);
+      if (autoKillReason !== null) {
+        this.kill(autoKillReason, 'auto');
+      }
+    }
   }
 
   private persistSignal(
@@ -1057,6 +1106,30 @@ export class PolyHunterEngine implements EnginePort {
       endingEquity: next.endingEquity,
       stopReason: next.stopReason,
     });
+  }
+
+  private checkFeedFreshness(): void {
+    if (this.status !== 'running') {
+      return;
+    }
+    const reference = this.lastBookAt ?? this.startedAt;
+    if (reference === null) {
+      return;
+    }
+    const ageMs = Math.max(0, this.now() - reference);
+    if (ageMs > this.config.feedStaleMs) {
+      this.kill(`stale feed: no book for ${ageMs}ms (limit ${this.config.feedStaleMs}ms)`, 'auto');
+    }
+  }
+
+  private emitAlert(alert: EngineAlert): void {
+    try {
+      void Promise.resolve(this.alertSink(alert)).catch((error: unknown) => {
+        this.logger.warn({ err: error, kind: alert.kind }, 'alert sink failed');
+      });
+    } catch (error) {
+      this.logger.warn({ err: error, kind: alert.kind }, 'alert sink failed');
+    }
   }
 
   private recordEvent(
