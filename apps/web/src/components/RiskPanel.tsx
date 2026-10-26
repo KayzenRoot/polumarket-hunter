@@ -55,6 +55,12 @@ export function RiskPanel({
         </StatusPill>
       </div>
 
+      {health.killReason !== null ? (
+        <p className="risk-kill-reason" role="status">
+          Kill reason: {health.killReason}
+        </p>
+      ) : null}
+
       <div className="meter-grid">
         <Meter
           label="Total exposure"

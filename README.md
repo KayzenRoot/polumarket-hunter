@@ -24,7 +24,8 @@ hard risk controls, replay/backtest and a realtime dashboard.
 - Simulates limit/market fills against the real book, including partial fills, per-market taker
   fee curves (Gamma `feeSchedule`), cash reservation and realized/unrealized PnL.
 - Blocks new exposure on stale or crossed books, wide spreads, missing depth, duplicate orders,
-  loss limits, drawdown limits, order-rate limits and the operator kill switch.
+  loss limits, drawdown limits, order-rate limits and the operator kill switch; auto-kills on loss,
+  drawdown or a stale feed and can post a webhook alert.
 - Persists paper sessions, signals, trades, portfolio snapshots and events to native SQLite
   (`node:sqlite`).
 - Records books to JSONL and replays them through the same strategy/broker for backtesting.

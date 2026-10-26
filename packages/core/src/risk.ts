@@ -99,6 +99,20 @@ export class RiskController {
     this.dailyPnl = roundMoney(totalPnl);
   }
 
+  public autoKillReason(portfolio: PortfolioSnapshot): string | null {
+    if (this.killed) {
+      return null;
+    }
+    if (this.dailyPnl <= -this.limits.maxDailyLoss) {
+      return `daily loss limit: ${this.dailyPnl} <= -${this.limits.maxDailyLoss}`;
+    }
+    const drawdown = this.drawdownPct(portfolio);
+    if (drawdown >= this.limits.maxDrawdownPct) {
+      return `drawdown limit: ${drawdown} >= ${this.limits.maxDrawdownPct}`;
+    }
+    return null;
+  }
+
   public drawdownPct(portfolio: PortfolioSnapshot): number {
     if (this.peakEquity <= 0) {
       return 0;

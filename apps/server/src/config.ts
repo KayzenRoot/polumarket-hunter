@@ -48,7 +48,19 @@ const envSchema = z.object({
   MIN_LIQUIDITY: numberish.pipe(z.number().min(0)).default(25_000),
   SCAN_INTERVAL_MS: numberish.pipe(z.number().int().min(5_000)).default(60_000),
   BOOK_STALE_MS: numberish.pipe(z.number().int().min(500)).default(5_000),
+  FEED_STALE_MS: numberish.pipe(z.number().int().min(1_000)).default(60_000),
   STREAM_RECONNECT_MAX_MS: numberish.pipe(z.number().int().min(1_000)).default(30_000),
+  ALERT_WEBHOOK_URL: z.preprocess(
+    (value) => (value === '' || value === undefined ? undefined : value),
+    z
+      .string()
+      .url()
+      .refine(
+        (value) => value.startsWith('http://') || value.startsWith('https://'),
+        'alert webhook must use http or https',
+      )
+      .optional(),
+  ),
 
   STRATEGY: z.enum(['micro-maker', 'momentum-taker']).default('micro-maker'),
   STARTING_CASH: numberish.pipe(z.number().positive()).default(1_000),
@@ -95,7 +107,9 @@ export interface AppConfig {
   readonly minLiquidity: number;
   readonly scanIntervalMs: number;
   readonly bookStaleMs: number;
+  readonly feedStaleMs: number;
   readonly streamReconnectMaxMs: number;
+  readonly alertWebhookUrl: string | null;
   readonly strategy: StrategyKind;
   readonly startingCash: number;
   readonly orderTtlMs: number;
@@ -177,7 +191,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     minLiquidity: data.MIN_LIQUIDITY,
     scanIntervalMs: data.SCAN_INTERVAL_MS,
     bookStaleMs: data.BOOK_STALE_MS,
+    feedStaleMs: data.FEED_STALE_MS,
     streamReconnectMaxMs: data.STREAM_RECONNECT_MAX_MS,
+    alertWebhookUrl: data.ALERT_WEBHOOK_URL ?? null,
     strategy: data.STRATEGY,
     startingCash: data.STARTING_CASH,
     orderTtlMs: data.ORDER_TTL_MS,

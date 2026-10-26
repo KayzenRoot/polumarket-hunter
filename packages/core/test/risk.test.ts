@@ -62,6 +62,28 @@ describe('risk controller', () => {
     expect(decision.reasons.join(' ')).toContain('drawdown');
   });
 
+  it('reports an auto-kill reason at the loss and drawdown limits', () => {
+    const daily = new RiskController(makeRiskLimits({ maxDailyLoss: 10 }), 1000);
+    daily.observeEquity(980, -20);
+    expect(daily.autoKillReason(makePortfolio({ equity: 980, totalPnl: -20 }))).toContain(
+      'daily loss limit',
+    );
+
+    const drawdown = new RiskController(makeRiskLimits({ maxDrawdownPct: 0.1 }), 1000);
+    drawdown.observeEquity(1000, 0);
+    expect(drawdown.autoKillReason(makePortfolio({ equity: 850, totalPnl: -150 }))).toContain(
+      'drawdown limit',
+    );
+
+    const clear = new RiskController(makeRiskLimits(), 1000);
+    clear.observeEquity(1000, 0);
+    expect(clear.autoKillReason(makePortfolio())).toBeNull();
+
+    const killed = new RiskController(makeRiskLimits(), 1000);
+    killed.kill('operator');
+    expect(killed.autoKillReason(makePortfolio({ equity: 0, totalPnl: -1000 }))).toBeNull();
+  });
+
   it('blocks a market notional breach', () => {
     const risk = new RiskController(makeRiskLimits({ maxNotionalPerMarket: 10 }), 1000);
     const decision = risk.evaluate({

@@ -64,6 +64,44 @@ The paper engine fails closed; a provider fault must never create exposure.
 Inspect `/api/health`, `/metrics` and the SQLite `events` table before restarting after a provider
 incident. Do not raise `BOOK_STALE_MS` or disable the stale/crossed checks to “make it trade”.
 
+## Auto-kill and alerts
+
+The engine can kill itself without operator input:
+
+- **Daily loss:** `MAX_DAILY_LOSS` (default `$25`) — triggers when daily PnL is at or below the
+  negative limit.
+- **Drawdown:** `MAX_DRAWDOWN_PCT` (default `0.08`) — triggers when equity falls from its peak by
+  that fraction.
+- **Stale feed:** `FEED_STALE_MS` (default `60000`) — triggers when no book has arrived for that
+  long, including a feed that never delivered a first book after start.
+
+On trigger the engine cancels resting paper orders, sets the risk kill switch, marks the session
+`killed`, persists an `auto_kill` event with the reason and timestamp, and emits a structured alert.
+The dashboard’s risk panel shows the kill reason. Restarting is never automatic: an operator must
+call reset-kill (or restart the process after the feed is healthy).
+
+Set `ALERT_WEBHOOK_URL` to an `http`/`https` endpoint to receive a JSON POST such as:
+
+```json
+{
+  "kind": "auto-kill",
+  "reason": "drawdown limit: 0.082 >= 0.08",
+  "at": 1790000000000,
+  "mode": "paper",
+  "sessionId": "ses_..."
+}
+```
+
+The webhook is best-effort; a failure is logged and does not block the kill. The local SQLite
+`events` row is the durable record. Keep the webhook on a trusted local network; do not put secrets
+in the URL.
+
+Recovery:
+
+1. Confirm the feed, venue and risk state in `/api/health`, `/metrics` and the dashboard.
+2. Fix the cause; do not raise a limit just to resume.
+3. Reset the kill switch explicitly and watch the first books before leaving it unattended.
+
 ## Production-style local run
 
 ```bash

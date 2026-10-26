@@ -35,6 +35,27 @@ async function main(): Promise<void> {
     gamma,
     clob,
     geoblock,
+    alertSink: async (alert) => {
+      if (config.alertWebhookUrl === null) {
+        return;
+      }
+      try {
+        const response = await fetch(config.alertWebhookUrl, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(alert),
+          signal: AbortSignal.timeout(5_000),
+        });
+        if (!response.ok) {
+          logger.warn(
+            { status: response.status, kind: alert.kind },
+            'alert webhook rejected the notification',
+          );
+        }
+      } catch (error) {
+        logger.warn({ err: error, kind: alert.kind }, 'alert webhook failed');
+      }
+    },
   });
 
   const app = await buildApp({ engine, config, logger });
