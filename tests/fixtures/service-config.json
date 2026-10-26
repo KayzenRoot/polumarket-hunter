@@ -1,0 +1,45 @@
+{
+  "deploy/systemd/polyhunter.service": [
+    "Restart=on-failure",
+    "RestartSec=5",
+    "KillSignal=SIGTERM",
+    "TimeoutStopSec=30",
+    "EnvironmentFile=-/opt/polyhunter/.env",
+    "StateDirectory=polyhunter",
+    "LogsDirectory=polyhunter",
+    "StandardOutput=append:/var/log/polyhunter/polyhunter.log",
+    "StandardError=append:/var/log/polyhunter/polyhunter.err.log",
+    "NoNewPrivileges=true"
+  ],
+  "deploy/logrotate/polyhunter": [
+    "daily",
+    "rotate 14",
+    "compress",
+    "copytruncate",
+    "su polyhunter polyhunter"
+  ],
+  "deploy/windows/register-polyhunter.ps1": [
+    "New-ScheduledTaskTrigger -AtLogOn",
+    "New-ScheduledTaskSettingsSet",
+    "-RestartCount 999",
+    "-RestartInterval",
+    "-MultipleInstances IgnoreNew",
+    "-ExecutionTimeLimit"
+  ],
+  "deploy/windows/run-polyhunter.ps1": ["'apps/server/dist/main.js'", "*>> $log", "$LASTEXITCODE"],
+  "deploy/windows/rotate-logs.ps1": [
+    "Copy-Item",
+    "SetLength(0)",
+    "RetentionDays",
+    "Remove-Item -Force"
+  ],
+  "docs/SUPERVISOR.md": [
+    "Restart=on-failure",
+    "RestartCount=999",
+    "copytruncate",
+    "/api/health",
+    "\"action\":\"kill\"",
+    "\"action\":\"reset-kill\"",
+    "kill switch is available"
+  ]
+}
