@@ -36,10 +36,27 @@ plus:
 - require conversation resolution;
 - linear history;
 - no force push, no branch deletion;
-- repository-admin bypass for emergency recovery only.
+- no admin bypass: the same checks apply to the owner.
 
 The ruleset is applied with the GitHub API after the first push. If a check name changes, update the
 ruleset in the same PR; a required check that never runs will block the queue.
+
+## Observed on this repository
+
+Checked on 2026-10-26 against the repository's check runs and PR activity:
+
+| App | Observed state | Notes |
+| --- | --- | --- |
+| **Socket Security** | Active | `Socket Security: Project Report` and `Pull Request Alerts` run and pass |
+| **SonarCloud** | Active | `SonarCloud Code Analysis` runs and the quality gate passes |
+| **GitHub Copilot PR reviewer** | Installed, quota exhausted | It attempted a review but reported insufficient quota; do not rely on it |
+| **Dependabot** | Active | Version and security updates, cooldown enabled |
+| **CodeQL / Scorecard** | Active | Native GitHub security workflows |
+| **ECC Tools** | Not observed | One-click install available below |
+| **CodeRabbit / Greptile** | Not observed | Optional second-opinion reviewers |
+
+The repository cannot enumerate or install GitHub Apps with a normal user token. Installation is a
+consent action owned by the GitHub account holder.
 
 ## GitHub Apps worth installing (free tiers)
 
