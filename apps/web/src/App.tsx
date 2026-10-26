@@ -316,6 +316,13 @@ export default function App() {
           {error !== null ? (
             <ErrorBanner title="Stream degraded" message={error} onRetry={() => void refresh()} />
           ) : null}
+          {connection === 'offline' && error === null ? (
+            <ErrorBanner
+              title="Stream offline"
+              message="The live SSE stream is disconnected. Falling back to /api/state polling every 10 seconds; the dashboard remains usable."
+              onRetry={() => void refresh()}
+            />
+          ) : null}
           {controlError !== null ? (
             <ErrorBanner
               title="Control action failed"

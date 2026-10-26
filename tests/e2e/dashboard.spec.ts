@@ -64,4 +64,89 @@ test.describe('PolyHunter dashboard', () => {
     await expect(page.getByText('ARMED')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/operator kill switch/)).toHaveCount(0);
   });
+
+  test('falls back to polling when the SSE stream is offline', async ({ page }) => {
+    await page.route('**/api/stream', (route) => route.abort());
+    await page.goto('/');
+    await expect(page.getByText('Stream offline', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Microstructure, measured.' })).toBeVisible();
+    await expect(page.getByText('STREAM OFFLINE', { exact: true })).toBeVisible();
+  });
+
+  test('shows empty states instead of a blank dashboard', async ({ page }) => {
+    const stateResponse = await page.request.get('/api/state');
+    const body = (await stateResponse.json()) as {
+      ok: true;
+      data: Record<string, unknown>;
+    };
+    const empty = {
+      ...body,
+      data: {
+        ...body.data,
+        markets: [],
+        trades: [],
+        signals: [],
+      },
+    };
+    await page.route('**/api/state', (route) => route.fulfill({ json: empty }));
+    await page.route('**/api/stream', (route) => route.abort());
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Markets' }).click();
+    await expect(page.getByText('No markets yet')).toBeVisible();
+    await page.getByRole('button', { name: 'Trades' }).click();
+    await expect(page.getByText('No paper fills yet')).toBeVisible();
+  });
+
+  test('recovers from a render crash with the error boundary', async ({ page }) => {
+    let first = true;
+    await page.route('**/api/stream', (route) => route.abort());
+    await page.route('**/api/state', async (route) => {
+      if (first) {
+        first = false;
+        await route.fulfill({
+          json: {
+            ok: true,
+            data: {
+              health: {
+                status: 'running',
+                mode: 'paper',
+                liveAuthorized: false,
+                liveAllowed: false,
+                liveBlockReason: 'paper mode',
+                startedAt: 1_000_000,
+                uptimeMs: 0,
+                markets: 0,
+                subscriptions: 0,
+                books: 0,
+                lastBookAt: null,
+                provider: {
+                  name: 'test',
+                  connected: false,
+                  lastMessageAt: null,
+                  reconnectCount: 0,
+                  error: null,
+                },
+                geoblock: {
+                  status: 'UNKNOWN',
+                  blocked: null,
+                  country: null,
+                  region: null,
+                  checkedAt: 1_000_000,
+                  reason: null,
+                },
+                killReason: null,
+              },
+              portfolio: null,
+            },
+          },
+        });
+        return;
+      }
+      await route.continue();
+    });
+    await page.goto('/');
+    await expect(page.getByText('Dashboard crashed')).toBeVisible();
+    await page.getByRole('button', { name: 'Reload dashboard' }).click();
+    await expect(page.getByRole('heading', { name: 'Microstructure, measured.' })).toBeVisible();
+  });
 });

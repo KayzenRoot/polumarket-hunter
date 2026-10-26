@@ -46,6 +46,26 @@ class Ring {
   }
 }
 
+export function emptyFeedHealth(bookStaleMs = 5000): FeedHealthSnapshot {
+  return {
+    lastBookAt: null,
+    ageMs: null,
+    ageP50Ms: null,
+    ageP95Ms: null,
+    ageP99Ms: null,
+    bookStaleMs,
+    gapP50Ms: null,
+    gapP95Ms: null,
+    gapP99Ms: null,
+    providerLatencyP50Ms: null,
+    providerLatencyP95Ms: null,
+    providerLatencyP99Ms: null,
+    messageGaps: 0,
+    stalePeriods: 0,
+    staleMs: 0,
+  };
+}
+
 export class FeedHealthTracker {
   private readonly bookStaleMs: number;
   private readonly gaps: Ring;

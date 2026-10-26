@@ -33,6 +33,7 @@ hard risk controls, replay/backtest and a realtime dashboard.
   JSON/CSV export.
 - Records books to JSONL and replays them through the same strategy/broker for backtesting.
 - Serves a Fastify API, SSE state stream, Prometheus metrics and a React terminal dashboard.
+- Keeps the dashboard usable through SSE offline (polling), empty data and render crashes.
 
 ## What it explicitly does not do
 
