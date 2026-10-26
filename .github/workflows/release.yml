@@ -75,6 +75,71 @@ jobs:
           sha256sum "$ARTIFACT" sbom.cdx.json > SHA256SUMS
           sha256sum -c SHA256SUMS
 
+      - name: Smoke test packaged artifact
+        run: |
+          set -euo pipefail
+          ARTIFACT="polyhunter-${PUBLISH_REF//\//-}-linux-x64.tar.gz"
+          SMOKE_DIR="$RUNNER_TEMP/polyhunter-smoke"
+          SMOKE_LOG="$RUNNER_TEMP/polyhunter-smoke.log"
+          rm -rf "$SMOKE_DIR"
+          mkdir -p "$SMOKE_DIR"
+          tar -xzf "$ARTIFACT" -C "$SMOKE_DIR"
+          cd "$SMOKE_DIR"
+          PORT=8795 HOST=127.0.0.1 DEMO_MODE=true NODE_ENV=production \
+            DATABASE_PATH="$RUNNER_TEMP/polyhunter-smoke.db" \
+            RECORD_DIR="$RUNNER_TEMP/polyhunter-recordings" \
+            LOG_LEVEL=error node apps/server/dist/main.js > "$SMOKE_LOG" 2>&1 &
+          SERVER_PID=$!
+          cleanup() {
+            kill -TERM "$SERVER_PID" 2>/dev/null || true
+            wait "$SERVER_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          READY=0
+          for _ in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8795/api/health > "$RUNNER_TEMP/health.json"; then
+              READY=1
+              break
+            fi
+            sleep 0.5
+          done
+          if [ "$READY" -ne 1 ]; then
+            echo "release artifact did not become healthy"
+            cat "$SMOKE_LOG"
+            exit 1
+          fi
+          HEALTH_PATH="$RUNNER_TEMP/health.json" node -e '
+            const fs = require("node:fs");
+            const r = JSON.parse(fs.readFileSync(process.env.HEALTH_PATH, "utf8"));
+            if (!r.ok || r.data.status !== "running" || r.data.mode !== "paper" || r.data.liveAllowed !== false) {
+              console.error(r);
+              process.exit(1);
+            }
+          '
+          curl -fsS http://127.0.0.1:8795/ -o "$RUNNER_TEMP/index.html"
+          grep -q '<div id="root"></div>' "$RUNNER_TEMP/index.html"
+          curl -fsS -X POST -H 'content-type: application/json' \
+            -d '{"action":"kill"}' http://127.0.0.1:8795/api/control -o "$RUNNER_TEMP/kill.json"
+          KILL_PATH="$RUNNER_TEMP/kill.json" node -e '
+            const fs = require("node:fs");
+            const r = JSON.parse(fs.readFileSync(process.env.KILL_PATH, "utf8"));
+            if (!r.ok || r.data.health.status !== "killed" || r.data.health.killReason !== "operator kill switch") {
+              console.error(r);
+              process.exit(1);
+            }
+          '
+          curl -fsS -X POST -H 'content-type: application/json' \
+            -d '{"action":"reset-kill"}' http://127.0.0.1:8795/api/control -o "$RUNNER_TEMP/reset.json"
+          RESET_PATH="$RUNNER_TEMP/reset.json" node -e '
+            const fs = require("node:fs");
+            const r = JSON.parse(fs.readFileSync(process.env.RESET_PATH, "utf8"));
+            if (!r.ok || r.data.health.status !== "running") {
+              console.error(r);
+              process.exit(1);
+            }
+          '
+          echo "packaged artifact smoke passed"
+
       - name: Write release notes
         run: |
           set -euo pipefail
