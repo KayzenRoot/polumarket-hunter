@@ -132,6 +132,9 @@ Session reports are rebuilt from SQLite; use the **Reports** dashboard view or
 `GET /api/sessions/:id/report` (JSON) / `/report.csv`. See
 [docs/SESSION-REPORT.md](SESSION-REPORT.md).
 
+Retention, backup, restore and disk/corruption recovery are in
+[docs/DATA-RETENTION.md](DATA-RETENTION.md).
+
 ## Backtesting a recording
 
 ```bash

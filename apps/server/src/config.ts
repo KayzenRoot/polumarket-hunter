@@ -49,6 +49,8 @@ const envSchema = z.object({
   SCAN_INTERVAL_MS: numberish.pipe(z.number().int().min(5_000)).default(60_000),
   BOOK_STALE_MS: numberish.pipe(z.number().int().min(500)).default(5_000),
   FEED_STALE_MS: numberish.pipe(z.number().int().min(1_000)).default(60_000),
+  RETENTION_DAYS: numberish.pipe(z.number().int().min(1)).default(30),
+  RECORDING_RETENTION_DAYS: numberish.pipe(z.number().int().min(1)).default(30),
   STREAM_RECONNECT_MAX_MS: numberish.pipe(z.number().int().min(1_000)).default(30_000),
   ALERT_WEBHOOK_URL: z.preprocess(
     (value) => (value === '' || value === undefined ? undefined : value),
@@ -108,6 +110,8 @@ export interface AppConfig {
   readonly scanIntervalMs: number;
   readonly bookStaleMs: number;
   readonly feedStaleMs: number;
+  readonly retentionDays: number;
+  readonly recordingRetentionDays: number;
   readonly streamReconnectMaxMs: number;
   readonly alertWebhookUrl: string | null;
   readonly strategy: StrategyKind;
@@ -192,6 +196,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     scanIntervalMs: data.SCAN_INTERVAL_MS,
     bookStaleMs: data.BOOK_STALE_MS,
     feedStaleMs: data.FEED_STALE_MS,
+    retentionDays: data.RETENTION_DAYS,
+    recordingRetentionDays: data.RECORDING_RETENTION_DAYS,
     streamReconnectMaxMs: data.STREAM_RECONNECT_MAX_MS,
     alertWebhookUrl: data.ALERT_WEBHOOK_URL ?? null,
     strategy: data.STRATEGY,

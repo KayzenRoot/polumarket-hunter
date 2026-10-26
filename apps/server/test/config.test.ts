@@ -89,6 +89,8 @@ describe('server configuration', () => {
     const defaults = loadConfig({ NODE_ENV: 'test' });
     expect(defaults.feedStaleMs).toBe(60_000);
     expect(defaults.alertWebhookUrl).toBeNull();
+    expect(defaults.retentionDays).toBe(30);
+    expect(defaults.recordingRetentionDays).toBe(30);
 
     expect(() =>
       loadConfig({ NODE_ENV: 'test', ALERT_WEBHOOK_URL: 'ftp://alerts.example.test' }),
