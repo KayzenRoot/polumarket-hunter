@@ -6,6 +6,7 @@ export * from './orderbook.js';
 export * from './paper-broker.js';
 export * from './portfolio.js';
 export * from './recording.js';
+export * from './research.js';
 export * from './risk.js';
 export * from './strategy.js';
 export * from './synthetic.js';
