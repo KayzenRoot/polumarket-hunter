@@ -28,9 +28,9 @@ Dependency and advisory handling is documented in [`DEPENDENCY-POLICY.md`](DEPEN
 `npm audit` is a required part of `quality`; accepted advisories live in
 `security/audit-exceptions.json` and must be time-bounded and owner-approved.
 
-## Required checks (ruleset intent)
+## Required checks and branch protection
 
-The `main` ruleset should require:
+The live `main-protection` ruleset (checked 2026-10-26) requires:
 
 - `quality`
 - `windows-quality`
@@ -38,10 +38,12 @@ The `main` ruleset should require:
 - `docker`
 - `codeql`
 - `security-gate`
+- `dependency-review`
+- `pr-title`
 
 plus:
 
-- pull request before merge (0 approvals is acceptable for a solo owner);
+- pull request before merge (0 approvals, which matches the solo-review decision below);
 - dismiss stale reviews on push;
 - require conversation resolution;
 - linear history;
@@ -62,8 +64,8 @@ Checked on 2026-10-26 against the repository's check runs and PR activity:
 | **GitHub Copilot PR reviewer** | Installed, quota exhausted | It attempted a review but reported insufficient quota; do not rely on it |
 | **Dependabot**                 | Active                     | Version and security updates, cooldown enabled                           |
 | **CodeQL / Scorecard**         | Active                     | Native GitHub security workflows                                         |
-| **ECC Tools**                  | Not observed               | One-click install available below                                        |
-| **CodeRabbit / Greptile**      | Not observed               | Optional second-opinion reviewers                                        |
+| **ECC Tools**                  | Active                     | Installed 2026-10-26; analysis completed and generated bundle reviewed   |
+| **CodeRabbit / Greptile**      | Not observed               | Optional second-opinion reviewers; not required for v0.1.x               |
 
 The repository cannot enumerate or install GitHub Apps with a normal user token. Installation is a
 consent action owned by the GitHub account holder.
@@ -108,15 +110,44 @@ primary reviewer and one optional second opinion, or the PR becomes noisy.
 ## Selected primary reviewer: ECC Tools
 
 The owner chose **ECC Tools** as the primary AI reviewer (#35). It is free for public repositories.
-Status: **install pending owner click**.
+Status: **installed and verified on 2026-10-26**.
 
-1. Open https://github.com/apps/ecc-tools while logged in as the owner.
-2. Install for **Only select repositories** → `polumarket-hunter`.
-3. Comment `/ecc-tools analyze` on an issue or pull request.
-4. Review the generated PR/check and record the result in #35.
+1. The app was installed for `polumarket-hunter` only.
+2. `/ecc-tools analyze` completed against 34 commits with 85% confidence.
+3. The generated bundle PR #77 was reviewed and intentionally not merged: the repository already
+   has a curated `.ecc/` set and OpenCode config, and merging the generated `.claude`/`.codex` bundle
+   would duplicate that contract.
+4. ECC Tools remains the primary AI reviewer for future PRs.
 
 Do not install CodeRabbit or Greptile as a second AI reviewer unless the owner explicitly asks;
 SonarCloud and Socket already provide the second static-analysis and supply-chain signals.
+
+## Code review decision: solo owner
+
+Decision date: **2026-10-26**.
+Owner: **KayzenRoot**.
+
+Decision: **no second human reviewer for v0.1.x; accept the solo-review risk with compensating
+controls.** No collaborator is added just to satisfy a badge, and the ruleset does not require an
+approval that a solo owner cannot provide.
+
+Compensating controls:
+
+- every change goes through a pull request with the required checks above;
+- no admin bypass, no force push and no branch deletion on `main`;
+- CodeQL, Semgrep, Gitleaks, OSV, Dependency Review, npm audit, Socket, SonarCloud and ECC Tools;
+- property-based tests for money and risk invariants, plus Playwright E2E;
+- small PRs with an evidence comment, and release evidence for every tag;
+- live execution remains unimplemented, so a review miss cannot submit a real order.
+
+Residual risk: a logic, financial-invariant or threat-model error can pass static analysis and the
+owner's review. This is accepted for a local paper-only terminal. A second human reviewer and an
+independent security audit are required before any live-trading work (#42–#46).
+
+Scorecard will continue to report `CodeReview` low and `BranchProtection` below maximum because the
+repository is solo and does not require approvals. That is the documented, intentional explanation,
+not an unaddressed vulnerability. Revisit this decision when a second maintainer joins or before
+v0.2.0 live readiness.
 
 ## Enabling secret scanning and Dependabot alerts
 
