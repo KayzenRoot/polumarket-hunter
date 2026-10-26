@@ -1,6 +1,15 @@
+import type { FeeSchedule, LiquidityRole } from './types.js';
+
 const PRICE_DECIMALS = 4;
 const SIZE_DECIMALS = 2;
 const MONEY_DECIMALS = 2;
+
+export const ZERO_FEE_SCHEDULE: FeeSchedule = {
+  rate: 0,
+  exponent: 1,
+  takerOnly: true,
+  rebateRate: 0,
+};
 
 export function roundTo(value: number, decimals: number): number {
   if (!Number.isFinite(value)) {
@@ -31,6 +40,41 @@ export function feeFor(amount: number, feeBps: number): number {
     return 0;
   }
   return roundMoney((amount * feeBps) / 10_000);
+}
+
+export function feeForSchedule(
+  shares: number,
+  price: number,
+  schedule: FeeSchedule,
+  liquidity: LiquidityRole,
+): number {
+  if (
+    !Number.isFinite(shares) ||
+    !Number.isFinite(price) ||
+    shares <= 0 ||
+    price <= 0 ||
+    price >= 1
+  ) {
+    return 0;
+  }
+  if (schedule.takerOnly && liquidity === 'maker') {
+    return 0;
+  }
+  if (!Number.isFinite(schedule.rate) || schedule.rate <= 0) {
+    return 0;
+  }
+  const exponent =
+    Number.isFinite(schedule.exponent) && schedule.exponent > 0 ? schedule.exponent : 1;
+  const curve = (price * (1 - price)) ** exponent;
+  return roundMoney(shares * schedule.rate * curve);
+}
+
+export function describeFeeModel(feeBps: number, schedule: FeeSchedule | null): string {
+  if (schedule === null) {
+    return `${Math.max(0, feeBps)} bps flat on notional (fallback)`;
+  }
+  const sides = schedule.takerOnly ? 'taker only' : 'maker and taker';
+  return `rate ${schedule.rate} x (p x (1-p))^${schedule.exponent}, ${sides}`;
 }
 
 export function clamp(value: number, min: number, max: number): number {

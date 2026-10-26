@@ -50,6 +50,15 @@ export interface TopOfBook {
   readonly crossed: boolean;
 }
 
+export interface FeeSchedule {
+  readonly rate: number;
+  readonly exponent: number;
+  readonly takerOnly: boolean;
+  readonly rebateRate: number | null;
+}
+
+export type LiquidityRole = 'maker' | 'taker';
+
 export interface Market {
   readonly id: string;
   readonly conditionId: string;
@@ -65,6 +74,8 @@ export interface Market {
   readonly active: boolean;
   readonly closed: boolean;
   readonly acceptingOrders: boolean;
+  readonly feesEnabled?: boolean | null;
+  readonly feeSchedule?: FeeSchedule | null;
 }
 
 export interface Position {

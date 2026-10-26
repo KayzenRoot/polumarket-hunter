@@ -23,23 +23,45 @@ train simulation. It answers “how would this frozen configuration have behaved
 
 ## Options
 
-| Option          | Default          | Meaning                                            |
-| --------------- | ---------------- | -------------------------------------------------- |
-| `--file`        | required         | JSONL recording                                    |
-| `--out`         | `data/reports`   | Output directory                                   |
-| `--strategy`    | `micro-maker`    | `micro-maker` or `momentum-taker`                  |
-| `--cash`        | `1000`           | Starting cash per split                            |
-| `--fee-bps`     | `0`              | Flat fee assumption used by the simulator          |
-| `--train-ratio` | `0.7`            | Time-based train fraction; must be between 0 and 1 |
-| `--edge`        | strategy default | `minEdge` override                                 |
-| `--imbalance`   | strategy default | `minImbalance` override                            |
-| `--max-spread`  | strategy default | `maxSpread` override                               |
-| `--take-profit` | strategy default | `takeProfitEdge` override                          |
-| `--stop-loss`   | strategy default | `stopLossEdge` override                            |
-| `--min-depth`   | strategy default | `minDepthShares` override                          |
+| Option             | Default          | Meaning                                            |
+| ------------------ | ---------------- | -------------------------------------------------- |
+| `--file`           | required         | JSONL recording                                    |
+| `--out`            | `data/reports`   | Output directory                                   |
+| `--strategy`       | `micro-maker`    | `micro-maker` or `momentum-taker`                  |
+| `--cash`           | `1000`           | Starting cash per split                            |
+| `--fee-bps`        | `0`              | Flat fallback fee when no rate is supplied         |
+| `--fee-rate`       | none             | Taker rate for the venue curve, e.g. `0.05`        |
+| `--fee-exponent`   | `1`              | Exponent applied to `p × (1-p)`                    |
+| `--fee-both-sides` | off              | Charge makers too; default is taker-only           |
+| `--train-ratio`    | `0.7`            | Time-based train fraction; must be between 0 and 1 |
+| `--edge`           | strategy default | `minEdge` override                                 |
+| `--imbalance`      | strategy default | `minImbalance` override                            |
+| `--max-spread`     | strategy default | `maxSpread` override                               |
+| `--take-profit`    | strategy default | `takeProfitEdge` override                          |
+| `--stop-loss`      | strategy default | `stopLossEdge` override                            |
+| `--min-depth`      | strategy default | `minDepthShares` override                          |
 
 The risk limits, tick size, momentum horizon, cooldown, order notional and order TTL stay at their
 defaults. Change them in code only through a reviewed PR so the config hash stays meaningful.
+
+## Fees
+
+Paper execution reads the per-market Gamma `feesEnabled`/`feeSchedule` and applies the venue curve
+`shares × rate × (p × (1-p))^exponent`, with maker fills free when `takerOnly` is true. A missing
+schedule falls back to `FEE_BPS`.
+
+Recordings do not carry market metadata, so the research harness uses a session-level assumption:
+
+```bash
+# taker-only venue curve, 5% rate
+npm run research -- --file data/recordings/session.jsonl --fee-rate 0.05
+
+# flat fallback, 25 bps on notional
+npm run research -- --file data/recordings/session.jsonl --fee-bps 25
+```
+
+The report prints the chosen assumption and includes it in the config hash. A zero-fee run is only
+comparable to another zero-fee run.
 
 ## Baselines
 
@@ -55,12 +77,13 @@ They still use the same `PaperBroker`, fee model and mark-to-market code as the 
 ## Config hash
 
 The report records a SHA-256 hash of a stable JSON descriptor containing the strategy kind,
-strategy config, risk limits, starting cash, fee bps, order TTL and split ratio. Two runs with the
-same inputs and config produce the same hash and the same report. Changing any of those fields
-changes the hash.
+strategy config, risk limits, starting cash, fee bps, fee schedule, order TTL and split ratio. Two
+runs with the same inputs and config produce the same hash and the same report. Changing any of
+those fields changes the hash.
 
-The JSON report contains the full descriptor and metrics, including equity curves. The Markdown
-report contains the key comparison table.
+The fee model is either a flat `--fee-bps` fallback or a venue-curve `--fee-rate` (optionally with
+`--fee-exponent` and `--fee-both-sides`). The Markdown report prints which one was used. The JSON
+report contains the full descriptor and metrics, including equity curves.
 
 ## Output files
 

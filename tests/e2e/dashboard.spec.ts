@@ -18,6 +18,7 @@ test.describe('PolyHunter dashboard', () => {
     await expect(page.getByRole('heading', { name: 'Market microstructure' })).toBeVisible();
     await page.getByRole('button', { name: 'Will BTC close above $100k this month?' }).click();
     await expect(page.getByText('Strategy decision', { exact: true })).toBeVisible();
+    await expect(page.getByText('fee-free', { exact: true })).toBeVisible();
     await expect(page.getByText('Asks', { exact: true })).toBeVisible();
     await expect(page.getByText('Bids', { exact: true })).toBeVisible();
 

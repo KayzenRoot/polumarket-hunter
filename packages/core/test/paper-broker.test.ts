@@ -1,8 +1,8 @@
 import { makeBook, makeClock } from '@polyhunter/testkit';
 import { describe, expect, it } from 'vitest';
-import { PaperBroker } from '../src/index.js';
+import { type FeeSchedule, PaperBroker } from '../src/index.js';
 
-function broker(startingCash = 1000, feeBps = 0) {
+function broker(startingCash = 1000, feeBps = 0, feeSchedule: FeeSchedule | null = null) {
   const clock = makeClock();
   let counter = 0;
   const instance = new PaperBroker({
@@ -14,6 +14,7 @@ function broker(startingCash = 1000, feeBps = 0) {
       return `${prefix}-${counter}`;
     },
     maxSlippage: 0.02,
+    ...(feeSchedule === null ? {} : { feeScheduleForMarket: () => feeSchedule }),
   });
   return { broker: instance, clock };
 }
@@ -47,6 +48,64 @@ describe('paper broker', () => {
     expect(fills[0]?.size).toBe(10);
     expect(instance.positionForToken('yes-token')?.shares).toBe(10);
     expect(instance.openOrders).toHaveLength(0);
+  });
+
+  it('charges the venue taker curve on market orders only', () => {
+    const schedule: FeeSchedule = { rate: 0.07, exponent: 1, takerOnly: true, rebateRate: 0 };
+    const { broker: instance } = broker(1000, 0, schedule);
+    const book = makeBook({
+      asks: [{ price: 0.5, size: 1000 }],
+      bids: [{ price: 0.48, size: 1000 }],
+    });
+    const taker = instance.place(
+      {
+        marketId: 'market-1',
+        tokenId: 'yes-token',
+        outcome: 'YES',
+        side: 'BUY',
+        type: 'market',
+        limitPrice: null,
+        size: 100,
+        reason: 'test',
+      },
+      book,
+    );
+    expect(taker.fills[0]?.fee).toBe(1.75);
+    expect(instance.trades[0]?.fee).toBe(1.75);
+
+    const { broker: makerBroker } = broker(1000, 0, schedule);
+    makerBroker.place({
+      marketId: 'market-1',
+      tokenId: 'yes-token',
+      outcome: 'YES',
+      side: 'BUY',
+      type: 'limit',
+      limitPrice: 0.48,
+      size: 100,
+      reason: 'test',
+    });
+    const fills = makerBroker.onBook(
+      makeBook({ asks: [{ price: 0.47, size: 1000 }], bids: [{ price: 0.45, size: 1000 }] }),
+    );
+    expect(fills[0]?.fee).toBe(0);
+  });
+
+  it('falls back to flat bps when the market schedule is missing', () => {
+    const { broker: instance } = broker(1000, 100);
+    const result = instance.place(
+      {
+        marketId: 'market-unknown',
+        tokenId: 'yes-token',
+        outcome: 'YES',
+        side: 'BUY',
+        type: 'market',
+        limitPrice: null,
+        size: 100,
+        reason: 'test',
+      },
+      makeBook({ asks: [{ price: 0.5, size: 1000 }], bids: [{ price: 0.48, size: 1000 }] }),
+    );
+    expect(result.fills[0]?.fee).toBe(0.5);
   });
 
   it('keeps a partially filled order open', () => {

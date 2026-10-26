@@ -1,4 +1,4 @@
-import { feeFor, roundMoney, roundPrice, roundSize } from './money.js';
+import { feeFor, feeForSchedule, roundMoney, roundPrice, roundSize } from './money.js';
 import { normalizeBook, topOfBook, walkBook } from './orderbook.js';
 import {
   applyFill,
@@ -12,6 +12,8 @@ import {
   settleMarket,
 } from './portfolio.js';
 import type {
+  FeeSchedule,
+  LiquidityRole,
   OrderBook,
   OrderRequest,
   PaperOrder,
@@ -27,6 +29,7 @@ export interface PaperBrokerOptions {
   readonly now: () => number;
   readonly idFactory?: (prefix: string) => string;
   readonly maxSlippage?: number;
+  readonly feeScheduleForMarket?: (marketId: string) => FeeSchedule | null;
 }
 
 export interface PlaceResult {
@@ -72,6 +75,7 @@ export class PaperBroker {
   private readonly now: () => number;
   private readonly idFactory: (prefix: string) => string;
   private readonly maxSlippage: number;
+  private readonly feeScheduleForMarket: (marketId: string) => FeeSchedule | null;
 
   public constructor(options: PaperBrokerOptions) {
     this.state = createPortfolio(options.startingCash, options.now());
@@ -79,6 +83,7 @@ export class PaperBroker {
     this.now = options.now;
     this.idFactory = options.idFactory ?? defaultIdFactory;
     this.maxSlippage = Math.max(0, options.maxSlippage ?? 0.005);
+    this.feeScheduleForMarket = options.feeScheduleForMarket ?? (() => null);
   }
 
   public get trades(): readonly Trade[] {
@@ -155,8 +160,14 @@ export class PaperBroker {
     }
 
     const price = limitPrice ?? (book === undefined ? 0 : this.referencePrice(book, request.side));
+    const marketable =
+      request.type === 'market' ||
+      (book !== undefined && limitPrice !== null && this.isMarketable(base, book));
+    const liquidity: LiquidityRole = marketable ? 'taker' : 'maker';
     if (request.side === 'BUY') {
-      const cost = roundMoney(price * size + feeFor(price * size, this.feeBps));
+      const cost = roundMoney(
+        price * size + this.feeForFill(base.marketId, price, size, liquidity),
+      );
       const available = roundMoney(this.state.cash - this.reservedCash());
       if (cost > available) {
         return {
@@ -190,7 +201,7 @@ export class PaperBroker {
     }
 
     if (book !== undefined && limitPrice !== null && this.isMarketable(base, book)) {
-      const result = this.fillAgainstBook(base, book);
+      const result = this.fillAgainstBook(base, book, 'taker');
       return { order: result.order, fills: result.fills };
     }
 
@@ -235,7 +246,7 @@ export class PaperBroker {
       if (!marketable) {
         continue;
       }
-      const result = this.fillAgainstBook(order, book);
+      const result = this.fillAgainstBook(order, book, 'maker');
       fills.push(...result.fills);
     }
     return fills;
@@ -276,6 +287,19 @@ export class PaperBroker {
     return trades;
   }
 
+  private feeForFill(
+    marketId: string,
+    price: number,
+    shares: number,
+    liquidity: LiquidityRole,
+  ): number {
+    const schedule = this.feeScheduleForMarket(marketId);
+    if (schedule !== null) {
+      return feeForSchedule(shares, price, schedule, liquidity);
+    }
+    return feeFor(roundMoney(price * shares), this.feeBps);
+  }
+
   private referencePrice(book: OrderBook, side: Side): number {
     const top = topOfBook(book);
     if (top === null) {
@@ -303,7 +327,7 @@ export class PaperBroker {
       };
     }
 
-    const fill = this.executeFill(order, walk.vwap, walk.filled);
+    const fill = this.executeFill(order, walk.vwap, walk.filled, 'taker');
     if (fill === null) {
       return {
         order: withStatus(order, 'rejected', 'fill rejected by portfolio', now),
@@ -325,6 +349,7 @@ export class PaperBroker {
   private fillAgainstBook(
     order: PaperOrder,
     rawBook: OrderBook,
+    liquidity: LiquidityRole,
   ): { order: PaperOrder; fills: readonly Trade[] } {
     const book = normalizeBook(rawBook);
     const levels = order.side === 'BUY' ? book.asks : book.bids;
@@ -336,14 +361,19 @@ export class PaperBroker {
     if (walk.filled <= 0) {
       return { order, fills: [] };
     }
-    const fill = this.executeFill(order, walk.vwap, walk.filled);
+    const fill = this.executeFill(order, walk.vwap, walk.filled, liquidity);
     if (fill === null) {
       return { order, fills: [] };
     }
     return { order: fill.order, fills: [fill.trade] };
   }
 
-  private executeFill(order: PaperOrder, price: number, size: number): FillResult | null {
+  private executeFill(
+    order: PaperOrder,
+    price: number,
+    size: number,
+    liquidity: LiquidityRole,
+  ): FillResult | null {
     const now = this.now();
     const normalizedSize = roundSize(size);
     const normalizedPrice = roundPrice(price);
@@ -352,7 +382,7 @@ export class PaperBroker {
     }
 
     const gross = roundMoney(normalizedPrice * normalizedSize);
-    const fee = feeFor(gross, this.feeBps);
+    const fee = this.feeForFill(order.marketId, normalizedPrice, normalizedSize, liquidity);
     const realizedBefore = this.state.realizedPnl;
 
     try {
@@ -432,7 +462,9 @@ export class PaperBroker {
         continue;
       }
       const remaining = remainingOf(order);
-      total += order.limitPrice * remaining + feeFor(order.limitPrice * remaining, this.feeBps);
+      total +=
+        order.limitPrice * remaining +
+        this.feeForFill(order.marketId, order.limitPrice, remaining, 'maker');
     }
     return roundMoney(total);
   }

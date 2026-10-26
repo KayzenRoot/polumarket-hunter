@@ -1,9 +1,11 @@
 import { runBacktest } from './backtest.js';
 import { formatPct, formatSignedUsd, formatUsd } from './format.js';
+import { describeFeeModel } from './money.js';
 import { topOfBook } from './orderbook.js';
 import { createStrategy } from './strategy.js';
 import type {
   BacktestMetrics,
+  FeeSchedule,
   OrderBook,
   RiskLimits,
   Strategy,
@@ -19,6 +21,7 @@ export interface ResearchConfig {
   readonly riskLimits: RiskLimits;
   readonly startingCash: number;
   readonly feeBps: number;
+  readonly feeSchedule?: FeeSchedule | null;
   readonly orderTtlMs: number;
   readonly trainRatio: number;
 }
@@ -34,6 +37,7 @@ export interface ResearchConfigDescriptor {
   readonly riskLimits: Readonly<Record<string, number>>;
   readonly startingCash: number;
   readonly feeBps: number;
+  readonly feeSchedule: FeeSchedule | null;
   readonly orderTtlMs: number;
   readonly trainRatio: number;
   readonly feeAssumption: string;
@@ -215,6 +219,7 @@ export function splitBooksByTime(
 export function describeResearchConfig(config: ResearchConfig): ResearchConfigDescriptor {
   const strategy = config.strategyConfig;
   const risk = config.riskLimits;
+  const schedule = config.feeSchedule ?? null;
   return {
     strategy: config.strategy,
     strategyConfig: {
@@ -243,9 +248,18 @@ export function describeResearchConfig(config: ResearchConfig): ResearchConfigDe
     },
     startingCash: config.startingCash,
     feeBps: config.feeBps,
+    feeSchedule:
+      schedule === null
+        ? null
+        : {
+            rate: schedule.rate,
+            exponent: schedule.exponent,
+            takerOnly: schedule.takerOnly,
+            rebateRate: schedule.rebateRate,
+          },
     orderTtlMs: config.orderTtlMs,
     trainRatio: config.trainRatio,
-    feeAssumption: `flat ${config.feeBps} bps on notional; per-market fee schedules are not modeled`,
+    feeAssumption: describeFeeModel(config.feeBps, schedule),
   };
 }
 
@@ -266,15 +280,22 @@ function runMetrics(
     riskLimits,
     startingCash: config.startingCash,
     feeBps: config.feeBps,
+    feeSchedule: config.feeSchedule ?? null,
     orderTtlMs: config.orderTtlMs,
   }).metrics;
 }
 
-function passiveAllocation(cash: number, markets: number, feeBps: number): number {
+function passiveAllocation(
+  cash: number,
+  markets: number,
+  feeBps: number,
+  feeSchedule: FeeSchedule | null,
+): number {
   if (markets <= 0) {
     return 0;
   }
-  const feeMultiplier = 1 + Math.max(0, feeBps) / 10_000;
+  const feeMultiplier =
+    feeSchedule === null ? 1 + Math.max(0, feeBps) / 10_000 : 1 + Math.max(0, feeSchedule.rate);
   return (cash / markets / feeMultiplier) * 0.995;
 }
 
@@ -296,11 +317,17 @@ export function runResearch(options: ResearchOptions): ResearchReport {
 
   const trainMarkets = new Set(train.map((book) => book.marketId)).size;
   const validationMarkets = new Set(validation.map((book) => book.marketId)).size;
-  const trainAllocation = passiveAllocation(options.startingCash, trainMarkets, options.feeBps);
+  const trainAllocation = passiveAllocation(
+    options.startingCash,
+    trainMarkets,
+    options.feeBps,
+    options.feeSchedule ?? null,
+  );
   const validationAllocation = passiveAllocation(
     options.startingCash,
     validationMarkets,
     options.feeBps,
+    options.feeSchedule ?? null,
   );
 
   const noTradeTrain = runMetrics(train, new HoldStrategy(), options, BASELINE_RISK_LIMITS);
@@ -348,7 +375,7 @@ export function runResearch(options: ResearchOptions): ResearchReport {
       'Train and validation are simulated independently, each with the configured starting cash.',
       'Validation is held out. Do not tune the strategy on validation metrics.',
       'Baselines use permissive risk limits so their exposure is not shaped by the strategy risk policy.',
-      'The config hash covers the strategy, risk limits, cash, fee bps, order TTL and split ratio.',
+      'The config hash covers the strategy, risk limits, cash, fee model, order TTL and split ratio.',
     ],
   };
 }

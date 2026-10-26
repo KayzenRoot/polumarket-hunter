@@ -1,10 +1,11 @@
-import { roundMoney, roundTo } from './money.js';
+import { describeFeeModel, roundMoney, roundTo } from './money.js';
 import { midPrice } from './orderbook.js';
 import { PaperBroker } from './paper-broker.js';
 import { RiskController } from './risk.js';
 import type {
   BacktestMetrics,
   EquityPoint,
+  FeeSchedule,
   OrderBook,
   PaperOrder,
   PortfolioSnapshot,
@@ -22,6 +23,7 @@ export interface BacktestOptions {
   readonly riskLimits: RiskLimits;
   readonly startingCash: number;
   readonly feeBps: number;
+  readonly feeSchedule?: FeeSchedule | null;
   readonly orderTtlMs: number;
 }
 
@@ -31,6 +33,7 @@ export interface BacktestResult {
   readonly signals: readonly Signal[];
   readonly orders: readonly PaperOrder[];
   readonly portfolio: PortfolioSnapshot;
+  readonly feeAssumption: string;
 }
 
 function maxDrawdown(curve: readonly EquityPoint[]): number {
@@ -49,6 +52,8 @@ function maxDrawdown(curve: readonly EquityPoint[]): number {
 
 export function runBacktest(options: BacktestOptions): BacktestResult {
   const { books, strategy, riskLimits, startingCash, feeBps, orderTtlMs } = options;
+  const feeSchedule = options.feeSchedule ?? null;
+  const feeAssumption = describeFeeModel(feeBps, feeSchedule);
   if (books.length === 0) {
     const emptyCurve: EquityPoint[] = [];
     return {
@@ -83,6 +88,7 @@ export function runBacktest(options: BacktestOptions): BacktestResult {
       signals: [],
       orders: [],
       portfolio: new PaperBroker({ startingCash, feeBps, now: () => Date.now() }).mark(new Map()),
+      feeAssumption,
     };
   }
 
@@ -98,6 +104,7 @@ export function runBacktest(options: BacktestOptions): BacktestResult {
         return `${prefix}_bt_${counter.toString(36)}`;
       };
     })(),
+    ...(feeSchedule === null ? {} : { feeScheduleForMarket: () => feeSchedule }),
   });
   const risk = new RiskController(riskLimits, startingCash);
   const signals: Signal[] = [];
@@ -242,7 +249,7 @@ export function runBacktest(options: BacktestOptions): BacktestResult {
     equityCurve,
   };
 
-  return { metrics, trades, signals, orders, portfolio };
+  return { metrics, trades, signals, orders, portfolio, feeAssumption };
 }
 
 export function formatBacktestReport(result: BacktestResult): string {
@@ -267,6 +274,7 @@ export function formatBacktestReport(result: BacktestResult): string {
     `max exposure      $${m.maxExposure.toFixed(2)}`,
     `fill rate         ${(m.fillRate * 100).toFixed(2)}%`,
     `tick sizes        ${m.tickSizes.length > 0 ? m.tickSizes.map((tick) => tick.toString()).join(', ') : '—'}`,
+    `fee model         ${result.feeAssumption}`,
   ];
   return lines.join('\n');
 }
