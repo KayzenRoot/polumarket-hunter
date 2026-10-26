@@ -1,0 +1,5 @@
+# Security scanner requirements. Keep this file minimal; pin exact versions.
+# Regenerate with:
+#   uv pip compile --python 3.12 --generate-hashes \
+#     requirements/security.in -o requirements/security.txt
+semgrep==1.182.1

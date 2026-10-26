@@ -55,7 +55,9 @@ jobs:
           python-version: '3.12'
 
       - name: Install Semgrep
-        run: python -m pip install --disable-pip-version-check semgrep==1.182.1
+        run: >-
+          python -m pip install --require-hashes --only-binary :all:
+          --disable-pip-version-check -r requirements/security.txt
 
       - name: Scan
         env:
