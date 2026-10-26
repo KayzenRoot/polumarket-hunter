@@ -1,5 +1,7 @@
+import type { Market } from '@polyhunter/core';
 import { PolyHunterDb } from '@polyhunter/persistence';
 import {
+  type BookFetchResult,
   type GeoblockResult,
   type MarketSocketOptions,
   unknownGeoblock,
@@ -8,7 +10,7 @@ import { makeBook, makeClock } from '@polyhunter/testkit';
 import type { Logger } from 'pino';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../src/config.js';
-import { PolyHunterEngine } from '../src/engine.js';
+import { type MarketStream, PolyHunterEngine } from '../src/engine.js';
 import { createLogger } from '../src/logger.js';
 
 interface Harness {
@@ -67,6 +69,129 @@ function harness(overrides: Record<string, string> = {}): Harness {
   engines.push(engine);
   databases.push(db);
   return { engine, db, clock, logger };
+}
+
+const LIVE_MARKET: Market = {
+  id: 'market-1',
+  conditionId: 'condition-1',
+  slug: 'market-1',
+  question: 'Market 1?',
+  endDate: null,
+  liquidity: 100_000,
+  volume24h: 50_000,
+  yesTokenId: 'yes-token',
+  noTokenId: 'no-token',
+  tickSize: 0.01,
+  negRisk: false,
+  active: true,
+  closed: false,
+  acceptingOrders: true,
+};
+
+const LIVE_TOKEN = {
+  marketId: 'market-1',
+  tokenId: 'yes-token',
+  outcome: 'YES' as const,
+  tickSize: 0.01,
+};
+
+function liveBookResult(): BookFetchResult {
+  return {
+    token: LIVE_TOKEN,
+    book: {
+      conditionId: 'condition-1',
+      assetId: 'yes-token',
+      timestamp: 1_000_000,
+      hash: null,
+      bids: [{ price: 0.48, size: 300 }],
+      asks: [{ price: 0.5, size: 300 }],
+      lastTradePrice: 0.49,
+      tickSize: 0.01,
+    },
+    error: null,
+  };
+}
+
+function liveHarness(
+  options: {
+    readonly books?: readonly BookFetchResult[];
+    readonly stream?: Partial<MarketStream>;
+  } = {},
+): { engine: PolyHunterEngine; db: PolyHunterDb; opened: string[] } {
+  const config = loadConfig({
+    NODE_ENV: 'test',
+    LOG_LEVEL: 'silent',
+    DEMO_MODE: 'false',
+    DATABASE_PATH: ':memory:',
+    MAX_MARKETS: '2',
+  });
+  const db = PolyHunterDb.inMemory();
+  databases.push(db);
+  const logger = createLogger({ ...config, logLevel: 'silent' });
+  const opened: string[] = [];
+  const engine = new PolyHunterEngine({
+    config,
+    db,
+    logger,
+    gamma: { listMarkets: async () => [LIVE_MARKET] },
+    clob: { getBooks: async () => options.books ?? [liveBookResult()] },
+    geoblock: {
+      ensureFresh: async () => ({
+        status: 'ELIGIBLE',
+        blocked: false,
+        ip: null,
+        country: null,
+        region: null,
+        checkedAt: 1_000_000,
+        reason: null,
+      }),
+      current: () => null,
+    },
+    socketFactory: () => ({
+      connect: () => opened.push('connect'),
+      close: () => opened.push('close'),
+      updateTokens: () => opened.push('update'),
+      isConnected: true,
+      lastMessage: 1_000_000,
+      reconnectCount: 0,
+      lastError: null,
+      ...options.stream,
+    }),
+    now: () => 1_000_000,
+  });
+  engines.push(engine);
+  return { engine, db, opened };
+}
+
+function liveRefusalHarness(geoblock: GeoblockResult): {
+  engine: PolyHunterEngine;
+  db: PolyHunterDb;
+} {
+  const config = loadConfig({
+    NODE_ENV: 'test',
+    LOG_LEVEL: 'silent',
+    DEMO_MODE: 'false',
+    TRADING_MODE: 'live',
+    LIVE_TRADING_AUTHORIZED: 'true',
+    DATABASE_PATH: ':memory:',
+  });
+  const db = PolyHunterDb.inMemory();
+  databases.push(db);
+  const logger = createLogger({ ...config, logLevel: 'silent' });
+  const engine = new PolyHunterEngine({
+    config,
+    db,
+    logger,
+    gamma: { listMarkets: async () => [] },
+    clob: { getBooks: async () => [] },
+    geoblock: {
+      ensureFresh: async () => geoblock,
+      current: () => null,
+    },
+    now: () => 1_000_000,
+  });
+  engines.push(engine);
+  return { engine, db };
 }
 
 function quoteBook(now: number) {
@@ -163,6 +288,49 @@ describe('paper engine', () => {
     engine.ingestBook(quoteBook(clock.now()));
     engine.ingestBook(quoteBook(clock.now()));
     expect(db.listSignals()).toHaveLength(1);
+  });
+
+  it('holds on stale and crossed books without creating exposure', async () => {
+    const { engine, clock, db } = harness();
+    await engine.start();
+    const tokenId = 'demo-yes-fed';
+    const marketId = 'demo-fed';
+
+    engine.ingestBook(
+      makeBook({
+        tokenId,
+        marketId,
+        outcome: 'YES',
+        timestamp: clock.now() - 60_000,
+        bids: [{ price: 0.48, size: 300 }],
+        asks: [{ price: 0.5, size: 100 }],
+      }),
+    );
+    const staleView = engine.state().markets.find((view) => view.market.yesTokenId === tokenId);
+    expect(staleView?.decision).toMatchObject({ action: 'HOLD' });
+    expect(staleView?.decision?.reasons.join(' ')).toContain('stale');
+
+    clock.advance(1000);
+    engine.ingestBook(
+      makeBook({
+        tokenId,
+        marketId,
+        outcome: 'YES',
+        timestamp: clock.now(),
+        bids: [{ price: 0.55, size: 300 }],
+        asks: [{ price: 0.5, size: 100 }],
+      }),
+    );
+    const crossedView = engine.state().markets.find((view) => view.market.yesTokenId === tokenId);
+    expect(crossedView?.decision).toMatchObject({ action: 'HOLD' });
+    expect(crossedView?.decision?.reasons.join(' ')).toContain('crossed');
+
+    const state = engine.state();
+    expect(state.portfolio.openOrders).toBe(0);
+    expect(state.portfolio.positions).toHaveLength(0);
+    expect(state.trades).toHaveLength(0);
+    expect(db.listSignals()).toHaveLength(0);
+    expect(db.listTrades()).toHaveLength(0);
   });
 
   it('blocks a buy that breaches the per-market risk limit', async () => {
@@ -312,38 +480,15 @@ describe('paper engine', () => {
   });
 
   it('refuses live mode even when authorized and eligible', async () => {
-    const config = loadConfig({
-      NODE_ENV: 'test',
-      LOG_LEVEL: 'silent',
-      DEMO_MODE: 'false',
-      TRADING_MODE: 'live',
-      LIVE_TRADING_AUTHORIZED: 'true',
-      DATABASE_PATH: ':memory:',
+    const { engine } = liveRefusalHarness({
+      status: 'ELIGIBLE',
+      blocked: false,
+      ip: '203.0.113.10',
+      country: 'PT',
+      region: null,
+      checkedAt: 1_000_000,
+      reason: null,
     });
-    const db = PolyHunterDb.inMemory();
-    databases.push(db);
-    const logger = createLogger({ ...config, logLevel: 'silent' });
-    const engine = new PolyHunterEngine({
-      config,
-      db,
-      logger,
-      gamma: { listMarkets: async () => [] },
-      clob: { getBooks: async () => [] },
-      geoblock: {
-        ensureFresh: async () => ({
-          status: 'ELIGIBLE',
-          blocked: false,
-          ip: '203.0.113.10',
-          country: 'PT',
-          region: null,
-          checkedAt: 1_000_000,
-          reason: null,
-        }),
-        current: () => null,
-      },
-      now: () => 1_000_000,
-    });
-    engines.push(engine);
 
     await expect(engine.start()).rejects.toThrow(/live execution adapter is not implemented/);
     expect(engine.health().status).toBe('error');
@@ -351,89 +496,46 @@ describe('paper engine', () => {
   });
 
   it('starts from live public clients when demo mode is off', async () => {
-    const config = loadConfig({
-      NODE_ENV: 'test',
-      LOG_LEVEL: 'silent',
-      DEMO_MODE: 'false',
-      DATABASE_PATH: ':memory:',
-      MAX_MARKETS: '2',
-    });
-    const db = PolyHunterDb.inMemory();
-    databases.push(db);
-    const logger = createLogger({ ...config, logLevel: 'silent' });
-    const opened: string[] = [];
-    const engine = new PolyHunterEngine({
-      config,
-      db,
-      logger,
-      gamma: {
-        listMarkets: async () => [
-          {
-            id: 'market-1',
-            conditionId: 'condition-1',
-            slug: 'market-1',
-            question: 'Market 1?',
-            endDate: null,
-            liquidity: 100_000,
-            volume24h: 50_000,
-            yesTokenId: 'yes-token',
-            noTokenId: 'no-token',
-            tickSize: 0.01,
-            negRisk: false,
-            active: true,
-            closed: false,
-            acceptingOrders: true,
-          },
-        ],
-      },
-      clob: {
-        getBooks: async () => [
-          {
-            token: { marketId: 'market-1', tokenId: 'yes-token', outcome: 'YES', tickSize: 0.01 },
-            book: {
-              conditionId: 'condition-1',
-              assetId: 'yes-token',
-              timestamp: 1_000_000,
-              hash: null,
-              bids: [{ price: 0.48, size: 300 }],
-              asks: [{ price: 0.5, size: 300 }],
-              lastTradePrice: 0.49,
-              tickSize: 0.01,
-            },
-            error: null,
-          },
-        ],
-      },
-      geoblock: {
-        ensureFresh: async () => ({
-          status: 'ELIGIBLE',
-          blocked: false,
-          ip: null,
-          country: null,
-          region: null,
-          checkedAt: 1_000_000,
-          reason: null,
-        }),
-        current: () => null,
-      },
-      socketFactory: () => ({
-        connect: () => opened.push('connect'),
-        close: () => opened.push('close'),
-        updateTokens: () => opened.push('update'),
-        isConnected: true,
-        lastMessage: 1_000_000,
-        reconnectCount: 0,
-        lastError: null,
-      }),
-      now: () => 1_000_000,
-    });
-    engines.push(engine);
+    const { engine, opened } = liveHarness();
 
     await engine.start();
     expect(engine.health().status).toBe('running');
     expect(engine.state().markets).toHaveLength(1);
     expect(opened).toContain('connect');
     expect(engine.health().provider.connected).toBe(true);
+  });
+
+  it('fails closed when the initial book fetch returns no books', async () => {
+    const { engine, db } = liveHarness({
+      books: [{ token: LIVE_TOKEN, book: null, error: 'HTTP 503' }],
+      stream: {
+        isConnected: false,
+        lastMessage: null,
+        reconnectCount: 2,
+        lastError: 'stream down',
+      },
+    });
+
+    await engine.start();
+    const state = engine.state();
+    expect(state.markets).toHaveLength(1);
+    expect(state.markets[0]?.book).toBeNull();
+    expect(state.portfolio.openOrders).toBe(0);
+    expect(state.portfolio.positions).toHaveLength(0);
+    expect(state.trades).toHaveLength(0);
+    expect(state.health.books).toBe(0);
+    expect(state.health.lastBookAt).toBeNull();
+    expect(state.health.provider).toMatchObject({
+      connected: false,
+      lastMessageAt: null,
+      reconnectCount: 2,
+      error: 'stream down',
+    });
+    expect(db.listSignals()).toHaveLength(0);
+    expect(db.listTrades()).toHaveLength(0);
+    expect(db.listEvents().map((event) => event.kind)).toContain('engine_started');
+    expect(engine.metrics()).toContain('polyhunter_provider_connected 0');
+    expect(engine.metrics()).toContain('polyhunter_last_book_age_ms -1');
   });
 
   it('fails closed when the scanner returns no markets', async () => {
@@ -494,38 +596,15 @@ describe('paper engine', () => {
   });
 
   it('refuses live mode when the venue geoblock is blocked', async () => {
-    const config = loadConfig({
-      NODE_ENV: 'test',
-      LOG_LEVEL: 'silent',
-      DEMO_MODE: 'false',
-      TRADING_MODE: 'live',
-      LIVE_TRADING_AUTHORIZED: 'true',
-      DATABASE_PATH: ':memory:',
+    const { engine } = liveRefusalHarness({
+      status: 'BLOCKED',
+      blocked: true,
+      ip: null,
+      country: 'BR',
+      region: null,
+      checkedAt: 1_000_000,
+      reason: 'blocked in BR',
     });
-    const db = PolyHunterDb.inMemory();
-    databases.push(db);
-    const logger = createLogger({ ...config, logLevel: 'silent' });
-    const engine = new PolyHunterEngine({
-      config,
-      db,
-      logger,
-      gamma: { listMarkets: async () => [] },
-      clob: { getBooks: async () => [] },
-      geoblock: {
-        ensureFresh: async () => ({
-          status: 'BLOCKED',
-          blocked: true,
-          ip: null,
-          country: 'BR',
-          region: null,
-          checkedAt: 1_000_000,
-          reason: 'blocked in BR',
-        }),
-        current: () => null,
-      },
-      now: () => 1_000_000,
-    });
-    engines.push(engine);
 
     await expect(engine.start()).rejects.toThrow(/live trading is not eligible/);
     expect(engine.health().status).toBe('error');
@@ -633,6 +712,7 @@ describe('paper engine', () => {
       at: 1_000_000,
     });
     expect(engine.state().markets[0]?.market.tickSize).toBe(0.001);
+    expect(db.listEvents().map((event) => event.kind)).toContain('tick_size_change');
 
     engine.ingestBook(
       makeBook({
@@ -672,5 +752,6 @@ describe('paper engine', () => {
 
     expect(engine.state().portfolio.positions).toHaveLength(0);
     expect(db.listTrades().length).toBeGreaterThanOrEqual(2);
+    expect(db.listEvents().map((event) => event.kind)).toContain('market_resolved');
   });
 });
