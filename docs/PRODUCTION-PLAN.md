@@ -25,9 +25,9 @@ It is **not** a promise of profit. It is a production-quality research terminal.
 | Coverage   | 87.01% statements / 76.25% branches / 90.82% functions / 86.86% lines       |
 | CI         | Quality, Windows, E2E and Docker green at `9170a07`                         |
 | Security   | CodeQL, Semgrep, Gitleaks, OSV, dependency review, actionlint, zizmor green |
-| Alerts     | 0 CodeQL, 0 secret-scanning, 0 Dependabot; Scorecard process items in #39   |
+| Alerts     | 0 CodeQL, 0 secret, 0 high Dependabot; 2 accepted medium scanner advisories |
 | Geoblock   | `BLOCKED` for BR; live remains disabled                                     |
-| Backlog    | v0.1.0: 0 open; v0.1.x: 6 open; v0.2.0: 6 blocked                           |
+| Backlog    | v0.1.0: 0 open; v0.1.x: 0 open; v0.2.0: 6 blocked                           |
 
 ## 3. Workstreams
 
@@ -197,16 +197,17 @@ Do not compress the evidence gate to hit a date.
 As of 2026-10-26:
 
 - v0.1.0 production: **0 open**, 25 closed (epics #10 and #13 closed; #11/#12 earlier).
-- v0.1.x hardening: **6 open** (#36–#41).
+- v0.1.x hardening: **0 open**, 8 closed (#36–#41, #82, #88).
 - v0.2.0 live readiness: **6 open, blocked** (#14, #42–#46).
-- Current gate: **G5 closed 2026-10-26**. `v0.1.0` is published and verified; no v0.1.0 action
-  remains.
+- Current gate: **G5 closed 2026-10-26**. `v0.1.0` is published and verified; the v0.1.x hardening
+  changes are on `main` and are ready for a patch release when the owner chooses.
 
 ## 11. Next action
 
-v0.1.0 is complete. Next work is the v0.1.x P2 hardening set (#36–#41), then a separate, explicitly
-authorized decision for live readiness. Do not enable live trading. The evidence memo keeps v0.1.0
-paper-only and makes no edge claim.
+v0.1.x hardening is complete. The next work is either a new paper-only strategy hypothesis with a
+pre-registered metric and a fresh out-of-sample session, or a separate, explicitly authorized
+live-readiness decision. Do not enable live trading. The evidence memo keeps v0.1.0 paper-only and
+makes no edge claim.
 
 The release workflow now uses a read-only top-level token and grants `contents: write` only to the
 release job. The published `v0.1.0` workflow used the previous top-level write scope; the release
