@@ -6,7 +6,7 @@
 | --------------------------------- | ------------------------------------------------------------------------------------------- |
 | `ci.yml` → `quality`              | npm audit gate, Biome lint/format, strict typecheck, tests, coverage gate, production build |
 | `ci.yml` → `windows-quality`      | Clean `npm ci`, lint, typecheck, coverage and build on Windows 24                           |
-| `ci.yml` → `e2e`                  | Playwright dashboard, navigation, kill switch and reset flow                                |
+| `ci.yml` → `e2e`                  | Playwright dashboard, keyboard, axe accessibility and mobile viewport flows                 |
 | `ci.yml` → `docker`               | Builds the image and probes a running API                                                   |
 | `release.yml`                     | Tag-driven artifact, CycloneDX SBOM and SHA256 checksums                                    |
 | `codeql.yml` → `codeql`           | GitHub CodeQL security-extended analysis for JavaScript/TypeScript                          |
