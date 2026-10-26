@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { makeBook } from '@polyhunter/testkit';
 import { describe, expect, it } from 'vitest';
 import {
   decodeRecording,
@@ -43,10 +44,16 @@ describe('recording validation', () => {
   });
 
   it('fails a gap above the hard threshold', () => {
-    const report = validateRecordingText(fixture('gap.jsonl'));
+    const report = validateRecordingText(fixture('gap.jsonl'), { maxGapMs: 30_000 });
     expect(report.ok).toBe(false);
     expect(report.coverage[0]?.maxGapMs).toBe(50_000);
     expect(report.errors.join(' ')).toContain('gap 50000ms exceeds max 30000ms');
+  });
+
+  it('tolerates a 50s gap by default with a warning', () => {
+    const report = validateRecordingText(fixture('gap.jsonl'));
+    expect(report.ok).toBe(true);
+    expect(report.warnings.join(' ')).toContain('warning threshold');
   });
 
   it('allows the same gap when the threshold is raised', () => {
@@ -55,11 +62,44 @@ describe('recording validation', () => {
     expect(report.warnings.join(' ')).toContain('warning threshold');
   });
 
-  it('fails a backwards timestamp for one token', () => {
+  it('fails a backwards timestamp beyond the skew tolerance', () => {
     const report = validateRecordingText(fixture('backwards.jsonl'));
     expect(report.ok).toBe(false);
     expect(report.errors.join(' ')).toContain('moved backwards');
     expect(report.outOfOrderBooks).toBe(1);
+  });
+
+  it('tolerates small backwards clock skew', () => {
+    const report = validateRecording({
+      books: [
+        makeBook({ timestamp: 1_000_000 }),
+        makeBook({ timestamp: 1_060_000 }),
+        makeBook({ timestamp: 1_059_500 }),
+      ],
+      errors: [],
+      warnings: [],
+    });
+    expect(report.ok).toBe(true);
+    expect(report.warnings.join(' ')).toContain('within 1000ms tolerance');
+  });
+
+  it('warns on a low crossed ratio and fails a high one', () => {
+    const mostlyClean = Array.from({ length: 200 }, (_, index) =>
+      makeBook({
+        timestamp: 1_000_000 + index * 1000,
+        ...(index === 100
+          ? { bids: [{ price: 0.55, size: 100 }], asks: [{ price: 0.5, size: 100 }] }
+          : {}),
+      }),
+    );
+    const low = validateRecording({ books: mostlyClean, errors: [], warnings: [] });
+    expect(low.ok).toBe(true);
+    expect(low.crossedBooks).toBe(1);
+    expect(low.warnings.join(' ')).toContain('crossed/locked');
+
+    const high = validateRecordingText(fixture('crossed.jsonl'));
+    expect(high.ok).toBe(false);
+    expect(high.errors.join(' ')).toContain('crossed book ratio');
   });
 
   it('warns on repeated hashes without failing', () => {
