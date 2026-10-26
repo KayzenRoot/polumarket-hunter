@@ -1,0 +1,6 @@
+interface:
+  display_name: "Polumarket Hunter"
+  short_description: "Repo-specific patterns and workflows for polumarket-hunter"
+  default_prompt: "Use the polumarket-hunter repo skill to follow existing architecture, testing, and workflow conventions."
+policy:
+  allow_implicit_invocation: true
