@@ -11,7 +11,7 @@ npm run dev
 - Dashboard: http://127.0.0.1:5173
 - API: http://127.0.0.1:8787
 - SSE: http://127.0.0.1:8787/api/stream
-- Metrics: http://127.0.0.1:8787/metrics
+- Metrics: http://127.0.0.1:8787/metrics (feed metrics: [docs/FEED-HEALTH.md](FEED-HEALTH.md))
 
 The API autostarts the paper engine unless `POLYHUNTER_AUTOSTART=false`.
 

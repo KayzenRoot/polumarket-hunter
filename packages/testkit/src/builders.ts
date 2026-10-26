@@ -1,5 +1,6 @@
 import type {
   BookLevel,
+  FeedHealthSnapshot,
   Market,
   OrderBook,
   PaperOrder,
@@ -159,6 +160,27 @@ export function makeSignal(overrides: Partial<Signal> = {}): Signal {
     confidence: 0.8,
     accepted: true,
     reasons: ['test signal'],
+    ...overrides,
+  };
+}
+
+export function makeFeedHealth(overrides: Partial<FeedHealthSnapshot> = {}): FeedHealthSnapshot {
+  return {
+    lastBookAt: 1_000_000,
+    ageMs: 0,
+    ageP50Ms: 0,
+    ageP95Ms: 0,
+    ageP99Ms: 0,
+    bookStaleMs: 5_000,
+    gapP50Ms: 1_000,
+    gapP95Ms: 1_500,
+    gapP99Ms: 2_000,
+    providerLatencyP50Ms: 50,
+    providerLatencyP95Ms: 120,
+    providerLatencyP99Ms: 200,
+    messageGaps: 10,
+    stalePeriods: 0,
+    staleMs: 0,
     ...overrides,
   };
 }

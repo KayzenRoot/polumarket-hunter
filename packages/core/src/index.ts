@@ -1,4 +1,5 @@
 export * from './backtest.js';
+export * from './feed-health.js';
 export * from './format.js';
 export * from './market-score.js';
 export * from './money.js';
