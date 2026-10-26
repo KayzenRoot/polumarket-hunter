@@ -113,9 +113,14 @@ The release notes must state whether the migration is reversible.
 
 ### Release naming
 
-The current `v0.1.0` tag/release is a bootstrap preview created before the production gate. At the
-gate it will be deleted and recreated on the production commit, with an explicit owner approval and
-a temporary tag-ruleset exception. A protected tag is never moved silently.
+The current `v0.1.0` tag/release was a bootstrap preview created before the production gate. At the
+gate it was replaced on the production commit with explicit owner approval.
+
+Execution note (2026-10-26): the bootstrap GitHub release was deleted and the existing lightweight
+`v0.1.0` tag was force-updated to an annotated tag at `9170a07`. The `release-tags` ruleset blocks
+deletion of `v*` tags but does not block updates, so no ruleset exception was required. This was a
+one-time bootstrap replacement; future releases use a new tag. See
+`docs/evidence/release-v0.1.0-2026-10-26.md`.
 
 ## 9. Quality and release gates
 

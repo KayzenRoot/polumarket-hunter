@@ -7,25 +7,27 @@ Milestone: [v0.1.0 - Production (paper-first)](https://github.com/KayzenRoot/pol
 
 ## 1. Definition of done
 
-v0.1.0 is “in production” when a clean Windows machine can install it, run a paper session, record
-and validate data, produce a research report, survive a provider failure, export a session, back up
-and restore data, and install a release artifact — with no live order path and no geoblock bypass.
+v0.1.0 is “in production” when a clean checkout on Windows can install it, run a paper session,
+record and validate data, produce a research report, survive a provider failure, export a session,
+back up and restore data, and the published Linux x64 artifact starts and reports healthy — with no
+live order path and no geoblock bypass. The owner accepted clean-checkout Windows evidence on
+2026-10-26; a freshly installed OS was not part of the accepted gate.
 
 It is **not** a promise of profit. It is a production-quality research terminal.
 
 ## 2. Current baseline
 
-| Item              | State                                                                       |
-| ----------------- | --------------------------------------------------------------------------- |
-| Repository        | Public, `main` protected by ruleset                                         |
-| Bootstrap release | `v0.1.0` preview tag (see release naming decision below)                    |
-| Tests             | 165 passing                                                                 |
-| Coverage          | 87.01% statements / 76.25% branches / 90.82% functions / 86.86% lines       |
-| CI                | Quality + E2E green                                                         |
-| Security          | CodeQL, Semgrep, Gitleaks, OSV, dependency review, actionlint, zizmor green |
-| Scorecard         | 7.0/10                                                                      |
-| Geoblock          | `BLOCKED` for BR; live remains disabled                                     |
-| Backlog           | 25 open in v0.1.0, 6 in v0.1.x, 6 blocked in v0.2.0                         |
+| Item       | State                                                                       |
+| ---------- | --------------------------------------------------------------------------- |
+| Repository | Public, `main` protected by ruleset                                         |
+| Release    | `v0.1.0` production, annotated tag on `9170a07`, published 2026-10-26       |
+| Tests      | 165 passing                                                                 |
+| Coverage   | 87.01% statements / 76.25% branches / 90.82% functions / 86.86% lines       |
+| CI         | Quality, Windows, E2E and Docker green at `9170a07`                         |
+| Security   | CodeQL, Semgrep, Gitleaks, OSV, dependency review, actionlint, zizmor green |
+| Alerts     | 0 CodeQL, 0 secret-scanning, 0 Dependabot; Scorecard process items in #39   |
+| Geoblock   | `BLOCKED` for BR; live remains disabled                                     |
+| Backlog    | v0.1.0: 0 open; v0.1.x: 6 open; v0.2.0: 6 blocked                           |
 
 ## 3. Workstreams
 
@@ -122,26 +124,29 @@ owner authorization. Do not start them because the dashboard looks ready.
 
 ## 5. Release naming decision
 
-The current `v0.1.0` tag/release is a **bootstrap preview**, created before the production gate.
-It must not be presented as the production release.
+The previous `v0.1.0` was a **bootstrap preview**, created before the production gate. It was never
+presented as the production release.
 
-**Decision (2026-10-26): Option A.** With owner approval, delete the preview tag/release and recreate
-`v0.1.0` on the production commit at G4. This requires a temporary, explicit tag-ruleset exception.
-A protected tag is never moved silently.
+**Decision (2026-10-26): Option A, executed.** The bootstrap GitHub release was deleted, and the
+lightweight `v0.1.0` tag was replaced by an annotated tag at the production commit `9170a07` (tag
+object `5fad0b0`). The remote tag was force-updated, not deleted: the `release-tags` ruleset blocks
+deletion of `v*` tags but does not block updates, so no ruleset exception was required. This was a
+one-time bootstrap replacement, not a normal release operation. The tag is annotated but unsigned;
+no GPG/SSH signing key was available in the release environment.
 
-The existing `v0.1.0` release must be marked as a pre-release until it is replaced, so consumers do
-not confuse it with the production artifact.
+Future releases use a new tag. Do not force-update a published production tag; the rollback path is
+a corrective patch tag, as documented in `docs/RELEASE.md`.
 
 ## 6. Gates
 
-| Gate           | Required evidence                                      | Issues                            |
-| -------------- | ------------------------------------------------------ | --------------------------------- |
-| G0 Contract    | Contract approved by owner                             | #15 — closed 2026-10-26           |
-| G1 Correctness | Tick/session/fault tests green; CI green               | #16, #17, #19 — closed 2026-10-26 |
-| G2 Evidence    | 3 validated sessions, baselines, decision memo         | #27–#30 — closed 2026-10-26       |
-| G3 Operations  | Doctor, retention/backup, report, control audit        | #18, #20–#26 — closed 2026-10-26  |
-| G4 Release     | Windows CI, Docker, SBOM/checksums, clean runbook      | #31–#35 — closed 2026-10-26       |
-| G5 Sign-off    | Owner approval; release naming decision; no open P0/P1 | owner approved NO-GO; tag pending |
+| Gate           | Required evidence                                      | Issues                                       |
+| -------------- | ------------------------------------------------------ | -------------------------------------------- |
+| G0 Contract    | Contract approved by owner                             | #15 — closed 2026-10-26                      |
+| G1 Correctness | Tick/session/fault tests green; CI green               | #16, #17, #19 — closed 2026-10-26            |
+| G2 Evidence    | 3 validated sessions, baselines, decision memo         | #27–#30 — closed 2026-10-26                  |
+| G3 Operations  | Doctor, retention/backup, report, control audit        | #18, #20–#26 — closed 2026-10-26             |
+| G4 Release     | Windows CI, Docker, SBOM/checksums, clean runbook      | #31–#35 — closed 2026-10-26                  |
+| G5 Sign-off    | Owner approval; release naming decision; no open P0/P1 | #10, #13 closed 2026-10-26; v0.1.0 published |
 
 A gate is not “mostly done”. It is open until every required issue is closed with evidence.
 
@@ -191,18 +196,20 @@ Do not compress the evidence gate to hit a date.
 
 As of 2026-10-26:
 
-- v0.1.0 production: **4 open** (epics #10–#13), 21 closed.
-- v0.1.x hardening: **6 open**.
-- v0.2.0 live readiness: **6 open, blocked**.
-- Current gate: **G5 — sign-off**. Owner approved the NO-GO recommendation; the production tag is
-  the only remaining action.
+- v0.1.0 production: **0 open**, 25 closed (epics #10 and #13 closed; #11/#12 earlier).
+- v0.1.x hardening: **6 open** (#36–#41).
+- v0.2.0 live readiness: **6 open, blocked** (#14, #42–#46).
+- Current gate: **G5 closed 2026-10-26**. `v0.1.0` is published and verified; no v0.1.0 action
+  remains.
 
 ## 11. Next action
 
-1. Close #29 and the completed epics #11/#12/#13.
-2. Recreate the production `v0.1.0` tag from `main` (the existing tag is a bootstrap pre-release).
-   The release workflow builds the artifact, CycloneDX SBOM and SHA256SUMS.
-3. Verify the release assets and checksums; close epic #10.
-4. Do not enable live trading. The memo explicitly keeps v0.1.0 paper-only and makes no edge claim.
+v0.1.0 is complete. Next work is the v0.1.x P2 hardening set (#36–#41), then a separate, explicitly
+authorized decision for live readiness. Do not enable live trading. The evidence memo keeps v0.1.0
+paper-only and makes no edge claim.
+
+The release workflow now uses a read-only top-level token and grants `contents: write` only to the
+release job. The published `v0.1.0` workflow used the previous top-level write scope; the release
+assets are unaffected, and the tighter scope applies to future releases.
 
 The first production PR should be small and boring. That is the point.
