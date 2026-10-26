@@ -34,9 +34,19 @@ if (markets.length === 0) {
 
 const tokens: TokenMetadata[] = [];
 for (const market of markets) {
-  tokens.push({ marketId: market.id, tokenId: market.yesTokenId, outcome: 'YES' });
+  tokens.push({
+    marketId: market.id,
+    tokenId: market.yesTokenId,
+    outcome: 'YES',
+    tickSize: market.tickSize,
+  });
   if (values.both) {
-    tokens.push({ marketId: market.id, tokenId: market.noTokenId, outcome: 'NO' });
+    tokens.push({
+      marketId: market.id,
+      tokenId: market.noTokenId,
+      outcome: 'NO',
+      tickSize: market.tickSize,
+    });
   }
 }
 

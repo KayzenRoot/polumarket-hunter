@@ -50,6 +50,36 @@ describe('micro maker strategy', () => {
     expect(intent.confidence).toBeGreaterThan(0);
   });
 
+  it('uses a 0.001 market tick for an improved bid', () => {
+    const strategy = new MicroMakerStrategy({ ...config, minEdge: 0.0001, minDepthShares: 10 });
+    const intent = strategy.evaluate(
+      makeBook({
+        tickSize: 0.001,
+        bids: [{ price: 0.48, size: 300 }],
+        asks: [{ price: 0.482, size: 100 }],
+      }),
+      { now: 1_000_000, position: null, lastEntryAt: null },
+    );
+
+    expect(intent.action).toBe('PLACE_BID');
+    expect(intent.price).toBe(0.481);
+  });
+
+  it('uses a 0.01 market tick for an improved bid', () => {
+    const strategy = new MicroMakerStrategy({ ...config, minEdge: 0.0001, minDepthShares: 10 });
+    const intent = strategy.evaluate(
+      makeBook({
+        tickSize: 0.01,
+        bids: [{ price: 0.48, size: 300 }],
+        asks: [{ price: 0.5, size: 100 }],
+      }),
+      { now: 1_000_000, position: null, lastEntryAt: null },
+    );
+
+    expect(intent.action).toBe('PLACE_BID');
+    expect(intent.price).toBe(0.49);
+  });
+
   it('rejects a wide spread', () => {
     const strategy = new MicroMakerStrategy(config);
     const intent = strategy.evaluate(

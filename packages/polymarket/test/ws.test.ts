@@ -7,8 +7,18 @@ import {
   type WebSocketLike,
 } from '../src/index.js';
 
-const YES: TokenMetadata = { marketId: 'market-1', tokenId: 'yes-token', outcome: 'YES' };
-const NO: TokenMetadata = { marketId: 'market-1', tokenId: 'no-token', outcome: 'NO' };
+const YES: TokenMetadata = {
+  marketId: 'market-1',
+  tokenId: 'yes-token',
+  outcome: 'YES',
+  tickSize: 0.01,
+};
+const NO: TokenMetadata = {
+  marketId: 'market-1',
+  tokenId: 'no-token',
+  outcome: 'NO',
+  tickSize: 0.01,
+};
 
 function resolver(tokenId: string): TokenMetadata | null {
   if (tokenId === YES.tokenId) {
@@ -38,6 +48,7 @@ describe('market message normalizer', () => {
     expect(update.books).toHaveLength(1);
     expect(update.books[0]?.tokenId).toBe('yes-token');
     expect(update.books[0]?.outcome).toBe('YES');
+    expect(update.books[0]?.tickSize).toBe(0.01);
     expect(update.books[0]?.timestamp).toBe(1_700_000_000_000);
   });
 
@@ -147,6 +158,26 @@ describe('market message normalizer', () => {
       conditionId: '0xmarket',
       winningAssetId: 'yes-token',
     });
+  });
+
+  it('applies a tick-size change to the next book snapshot', () => {
+    const normalizer = new MarketMessageNormalizer(resolver);
+    normalizer.ingest(bookMessage(), 1_700_000_000_000);
+    const change = normalizer.ingest(
+      {
+        event_type: 'tick_size_change',
+        market: '0xmarket',
+        asset_id: 'yes-token',
+        old_tick_size: '0.01',
+        new_tick_size: '0.001',
+        timestamp: '1700000001000',
+      },
+      1_700_000_001_000,
+    );
+    expect(change.events[0]).toMatchObject({ type: 'tick_size_change', newTickSize: 0.001 });
+
+    const update = normalizer.ingest(bookMessage({ tick_size: '0.001' }), 1_700_000_002_000);
+    expect(update.books[0]?.tickSize).toBe(0.001);
   });
 
   it('ignores unknown tokens, malformed payloads and unknown event types', () => {

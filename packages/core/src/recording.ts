@@ -57,6 +57,7 @@ export function decodeBook(value: unknown): OrderBook | null {
   const asks = parseLevels(candidate.asks);
   const lastTradePrice = candidate.lastTradePrice;
   const hash = candidate.hash;
+  const tickSize = candidate.tickSize;
 
   if (
     typeof tokenId !== 'string' ||
@@ -73,6 +74,7 @@ export function decodeBook(value: unknown): OrderBook | null {
     tokenId,
     marketId,
     outcome,
+    tickSize: typeof tickSize === 'number' ? tickSize : 0.01,
     timestamp,
     bids,
     asks,

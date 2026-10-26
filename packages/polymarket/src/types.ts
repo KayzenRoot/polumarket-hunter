@@ -4,6 +4,7 @@ export interface TokenMetadata {
   readonly marketId: string;
   readonly tokenId: string;
   readonly outcome: Outcome;
+  readonly tickSize: number;
 }
 
 export type TokenResolver = (tokenId: string) => TokenMetadata | null;
@@ -16,6 +17,7 @@ export interface RawBook {
   readonly bids: readonly { price: number; size: number }[];
   readonly asks: readonly { price: number; size: number }[];
   readonly lastTradePrice: number | null;
+  readonly tickSize: number | null;
 }
 
 export interface BookFetchResult {

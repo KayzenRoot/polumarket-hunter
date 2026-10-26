@@ -10,6 +10,14 @@ describe('recording format', () => {
     expect(decoded).toEqual(book);
   });
 
+  it('round-trips a 0.001 tick and defaults legacy records to 0.01', () => {
+    const book = makeBook({ tickSize: 0.001 });
+    expect(decodeRecordingLine(encodeBook(book))?.tickSize).toBe(0.001);
+
+    const legacy = { ...makeBook(), tickSize: undefined };
+    expect(decodeBook(legacy)?.tickSize).toBe(0.01);
+  });
+
   it('accepts a raw book object', () => {
     const book = makeBook();
     expect(decodeBook(book)).toEqual(book);

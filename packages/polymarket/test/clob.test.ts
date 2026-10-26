@@ -7,6 +7,7 @@ const meta: TokenMetadata = {
   marketId: 'market-1',
   tokenId: 'yes-token',
   outcome: 'YES',
+  tickSize: 0.01,
 };
 
 describe('clob book mapping', () => {
@@ -37,6 +38,21 @@ describe('clob book mapping', () => {
   it('rejects malformed books', () => {
     expect(parseRawBook({ asset_id: 'yes-token' })).toBeNull();
     expect(parseRawBook(null)).toBeNull();
+  });
+
+  it('maps a 0.001 tick from the raw book or token metadata', () => {
+    const raw = parseRawBook(makeClobBook({ tick_size: '0.001' }));
+    expect(raw?.tickSize).toBe(0.001);
+    if (raw === null) {
+      throw new Error('expected a parsed raw book');
+    }
+    expect(mapRawBook(raw, { ...meta, tickSize: 0.01 }).tickSize).toBe(0.001);
+
+    const withoutRawTick = parseRawBook(makeClobBook({ tick_size: undefined }));
+    if (withoutRawTick === null) {
+      throw new Error('expected a parsed raw book');
+    }
+    expect(mapRawBook(withoutRawTick, { ...meta, tickSize: 0.001 }).tickSize).toBe(0.001);
   });
 });
 
@@ -84,7 +100,7 @@ describe('clob client', () => {
     const client = new ClobClient({ fetchImpl, maxRetries: 0 });
     const results = await client.getBooks([
       meta,
-      { marketId: 'market-2', tokenId: 'other-token', outcome: 'NO' },
+      { marketId: 'market-2', tokenId: 'other-token', outcome: 'NO', tickSize: 0.01 },
     ]);
 
     expect(results).toHaveLength(2);

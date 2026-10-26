@@ -7,6 +7,7 @@ import {
   isBookUsable,
   midPrice,
   normalizeBook,
+  normalizeTickSize,
   orderBookImbalance,
   roundPrice,
   topOfBook,
@@ -143,5 +144,15 @@ describe('order book math', () => {
     ).toBe(false);
     expect(isBookUsable(makeBook({ timestamp: 0 }), 5_000, now).ok).toBe(false);
     expect(isBookUsable(makeBook(), 5_000, 1_000_000).ok).toBe(true);
+  });
+
+  it('preserves a valid market tick and fails back to 0.01', () => {
+    expect(normalizeTickSize(0.001)).toBe(0.001);
+    expect(normalizeTickSize(0.01)).toBe(0.01);
+    expect(normalizeTickSize(0)).toBe(0.01);
+    expect(normalizeTickSize(1)).toBe(0.01);
+    expect(normalizeTickSize(Number.NaN)).toBe(0.01);
+    expect(normalizeBook(makeBook({ tickSize: 0.001 })).tickSize).toBe(0.001);
+    expect(normalizeBook(makeBook({ tickSize: 0 })).tickSize).toBe(0.01);
   });
 });

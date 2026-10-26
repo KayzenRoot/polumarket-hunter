@@ -99,8 +99,8 @@ export function MarketsTable({
                     </button>
                     <span className="market-meta">
                       {formatCompactUsd(view.market.volume24h)} 24h ·{' '}
-                      {formatCompactUsd(view.market.liquidity)} liq · ends{' '}
-                      {endLabel(view.market.endDate)}
+                      {formatCompactUsd(view.market.liquidity)} liq · tick{' '}
+                      {formatPrice(view.market.tickSize)} · ends {endLabel(view.market.endDate)}
                     </span>
                   </div>
                 </td>

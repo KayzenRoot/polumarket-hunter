@@ -49,11 +49,19 @@ function aggregate(levels: readonly BookLevel[], direction: 'asc' | 'desc'): Boo
   return result;
 }
 
+export function normalizeTickSize(value: number): number {
+  if (!Number.isFinite(value) || value <= 0 || value >= 1) {
+    return 0.01;
+  }
+  return roundPrice(value);
+}
+
 export function normalizeBook(book: OrderBook): OrderBook {
   return {
     tokenId: book.tokenId,
     marketId: book.marketId,
     outcome: book.outcome,
+    tickSize: normalizeTickSize(book.tickSize),
     timestamp: book.timestamp,
     bids: aggregate(book.bids, 'desc'),
     asks: aggregate(book.asks, 'asc'),

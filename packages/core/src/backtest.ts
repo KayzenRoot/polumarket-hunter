@@ -76,6 +76,7 @@ export function runBacktest(options: BacktestOptions): BacktestResult {
         maxDrawdownPct: 0,
         maxExposure: 0,
         fillRate: 0,
+        tickSizes: [],
         equityCurve: emptyCurve,
       },
       trades: [],
@@ -237,6 +238,7 @@ export function runBacktest(options: BacktestOptions): BacktestResult {
     maxDrawdownPct: maxDrawdown(equityCurve),
     maxExposure: roundMoney(Math.max(...equityCurve.map((point) => point.exposure), 0)),
     fillRate: ordersPlaced > 0 ? roundTo(trades.length / ordersPlaced, 4) : 0,
+    tickSizes: [...new Set(books.map((book) => book.tickSize))].sort((left, right) => left - right),
     equityCurve,
   };
 
@@ -264,6 +266,7 @@ export function formatBacktestReport(result: BacktestResult): string {
     `max drawdown      ${(m.maxDrawdownPct * 100).toFixed(2)}%`,
     `max exposure      $${m.maxExposure.toFixed(2)}`,
     `fill rate         ${(m.fillRate * 100).toFixed(2)}%`,
+    `tick sizes        ${m.tickSizes.length > 0 ? m.tickSizes.map((tick) => tick.toString()).join(', ') : '—'}`,
   ];
   return lines.join('\n');
 }

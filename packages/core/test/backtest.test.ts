@@ -68,6 +68,7 @@ describe('backtest engine', () => {
 
     expect(result.metrics.books).toBe(180);
     expect(result.metrics.equityCurve).toHaveLength(180);
+    expect(result.metrics.tickSizes).toEqual([0.01]);
     expect(result.metrics.endingEquity).toBeGreaterThan(0);
     expect(result.metrics.signals).toBeGreaterThan(0);
     expect(result.metrics.ordersPlaced).toBeGreaterThan(0);

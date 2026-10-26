@@ -36,6 +36,10 @@ export const DEFAULT_STRATEGY_CONFIG: StrategyConfig = {
 const MOMENTUM_FAST_ALPHA = 0.35;
 const MOMENTUM_SLOW_ALPHA = 0.08;
 
+function tickSizeFor(book: OrderBook, config: StrategyConfig): number {
+  return Number.isFinite(book.tickSize) && book.tickSize > 0 ? book.tickSize : config.tickSize;
+}
+
 function hold(
   book: OrderBook,
   top: TopOfBook | null,
@@ -227,7 +231,8 @@ export class MicroMakerStrategy implements Strategy {
       return hold(book, top, fair, edgeAtBid, confidence, rejections, context.now);
     }
 
-    const improvedBid = roundToTick(top.bid + this.config.tickSize, this.config.tickSize);
+    const tickSize = tickSizeFor(book, this.config);
+    const improvedBid = roundToTick(top.bid + tickSize, tickSize);
     const price =
       improvedBid < top.ask && roundPrice(fair - improvedBid) >= this.config.minEdge
         ? improvedBid

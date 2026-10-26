@@ -18,6 +18,7 @@ export interface OrderBook {
   readonly tokenId: string;
   readonly marketId: string;
   readonly outcome: Outcome;
+  readonly tickSize: number;
   readonly timestamp: number;
   readonly bids: readonly BookLevel[];
   readonly asks: readonly BookLevel[];
@@ -334,6 +335,7 @@ export interface BacktestMetrics {
   readonly maxDrawdownPct: number;
   readonly maxExposure: number;
   readonly fillRate: number;
+  readonly tickSizes: readonly number[];
   readonly equityCurve: readonly EquityPoint[];
 }
 
