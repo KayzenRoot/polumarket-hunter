@@ -281,6 +281,8 @@ describe('paper engine', () => {
       stopReason: null,
     });
     expect(state.sessions.map((session) => session.id)).toContain(state.session?.id);
+    expect(state.feedHealth.messageGaps).toBeGreaterThan(0);
+    expect(state.feedHealth.ageMs).toBe(0);
   });
 
   it('places a resting bid, fills it and persists the trade', async () => {
@@ -607,6 +609,10 @@ describe('paper engine', () => {
     expect(metrics).toContain('polyhunter_up 1');
     expect(metrics).toContain('polyhunter_provider_connected 1');
     expect(metrics).toContain('polyhunter_equity_usd');
+    expect(metrics).toContain('polyhunter_book_age_p95_ms');
+    expect(metrics).toContain('polyhunter_message_gap_p99_ms');
+    expect(metrics).toContain('polyhunter_provider_reconnects_total');
+    expect(metrics).toContain('polyhunter_feed_stale_periods_total');
   });
 
   it('refuses live mode even when authorized and eligible', async () => {

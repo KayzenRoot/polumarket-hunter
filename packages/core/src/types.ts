@@ -303,10 +303,29 @@ export interface PublicConfig {
   readonly riskLimits: RiskLimits;
 }
 
+export interface FeedHealthSnapshot {
+  readonly lastBookAt: number | null;
+  readonly ageMs: number | null;
+  readonly ageP50Ms: number | null;
+  readonly ageP95Ms: number | null;
+  readonly ageP99Ms: number | null;
+  readonly bookStaleMs: number;
+  readonly gapP50Ms: number | null;
+  readonly gapP95Ms: number | null;
+  readonly gapP99Ms: number | null;
+  readonly providerLatencyP50Ms: number | null;
+  readonly providerLatencyP95Ms: number | null;
+  readonly providerLatencyP99Ms: number | null;
+  readonly messageGaps: number;
+  readonly stalePeriods: number;
+  readonly staleMs: number;
+}
+
 export interface StateResponse {
   readonly health: EngineHealth;
   readonly session: PaperSession | null;
   readonly sessions: readonly PaperSession[];
+  readonly feedHealth: FeedHealthSnapshot;
   readonly markets: readonly MarketView[];
   readonly portfolio: PortfolioSnapshot;
   readonly trades: readonly Trade[];

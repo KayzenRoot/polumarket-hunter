@@ -1380,6 +1380,63 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.feed-panel {
+  padding: 17px 18px 18px;
+}
+
+.feed-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.feed-head h2 {
+  margin: 4px 0 0;
+  font-size: 15px;
+  font-weight: 630;
+}
+
+.feed-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+.feed-stat {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.feed-stat span {
+  color: var(--faint);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.feed-stat strong {
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.feed-stat small {
+  color: var(--faint);
+  font-size: 9px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 .meter-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -10,6 +10,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { api } from './api.js';
 import { EquityChart } from './components/EquityChart.js';
+import { FeedHealthPanel } from './components/FeedHealthPanel.js';
 import { AlertIcon, LogoIcon, RefreshIcon } from './components/Icons.js';
 import { KpiCard } from './components/KpiCard.js';
 import { MarketsTable } from './components/MarketsTable.js';
@@ -586,6 +587,7 @@ export default function App() {
                   <RiskPanel risk={risk} portfolio={portfolio} health={health} />
                 </section>
                 <div className="stack">
+                  <FeedHealthPanel feed={state.feedHealth} health={health} />
                   <ConfigCard state={state} />
                   <ComplianceCard state={state} />
                 </div>

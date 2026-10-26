@@ -14,6 +14,7 @@ import type {
 import { scoreMarket, topOfBook } from '@polyhunter/core';
 import {
   makeBook,
+  makeFeedHealth,
   makeMarket,
   makePortfolio,
   makeRiskLimits,
@@ -115,6 +116,7 @@ export function makeState(overrides: Partial<StateResponse> = {}): StateResponse
     health: makeHealth(),
     session: makeSession(),
     sessions: [makeSession()],
+    feedHealth: makeFeedHealth(),
     markets: [makeMarketView()],
     portfolio: makePortfolio(),
     trades: [makeTrade()],

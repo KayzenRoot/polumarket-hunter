@@ -4,6 +4,7 @@ import {
   createStrategy,
   type EngineHealth,
   type EngineStatus,
+  FeedHealthTracker,
   generateSyntheticBooks,
   type Market,
   type MarketDetail,
@@ -118,7 +119,7 @@ export class PolyHunterEngine implements EnginePort {
   private status: EngineStatus = 'stopped';
   private session: PaperSession | null = null;
   private startedAt: number | null = null;
-  private lastBookAt: number | null = null;
+  private readonly feedHealth: FeedHealthTracker;
   private killReason: string | null = null;
   private geoblockResult: GeoblockResult;
   private stream: MarketStream | null = null;
@@ -170,6 +171,7 @@ export class PolyHunterEngine implements EnginePort {
     this.recorderFactory =
       deps.recorderFactory ?? ((directory, now) => new BookRecorder(directory, now));
     this.alertSink = deps.alertSink ?? (() => undefined);
+    this.feedHealth = new FeedHealthTracker({ bookStaleMs: this.config.bookStaleMs });
     this.geoblockResult = unknownGeoblock(this.now(), 'not checked');
     this.broker = this.createBroker();
     this.strategy = createStrategy(this.config.strategy, this.config.strategyConfig);
@@ -210,6 +212,7 @@ export class PolyHunterEngine implements EnginePort {
     this.status = 'starting';
     this.startedAt = this.now();
     this.killReason = null;
+    this.feedHealth.reset();
     this.broker = this.createBroker();
     this.portfolioSnapshot = this.broker.mark(new Map());
     this.decisions.clear();
@@ -385,7 +388,7 @@ export class PolyHunterEngine implements EnginePort {
     }
     const book = normalizeBook(rawBook);
     this.books.set(book.tokenId, book);
-    this.lastBookAt = this.now();
+    this.feedHealth.recordBook(this.now(), book.timestamp);
     this.booksIngested += 1;
     this.recorder?.write(book);
 
@@ -505,7 +508,7 @@ export class PolyHunterEngine implements EnginePort {
       ? {
           name: 'demo-generator',
           connected: this.status === 'running' || this.status === 'killed',
-          lastMessageAt: this.lastBookAt,
+          lastMessageAt: this.feedHealth.lastBook,
           reconnectCount: 0,
           error: null,
         }
@@ -528,7 +531,7 @@ export class PolyHunterEngine implements EnginePort {
       markets: this.markets.size,
       subscriptions: this.subscriptions.length,
       books: this.books.size,
-      lastBookAt: this.lastBookAt,
+      lastBookAt: this.feedHealth.lastBook,
       provider,
       geoblock: {
         status: this.geoblockResult.status,
@@ -604,6 +607,7 @@ export class PolyHunterEngine implements EnginePort {
       health: this.health(),
       session: this.session,
       sessions: this.sessions(20),
+      feedHealth: this.feedHealth.snapshot(now),
       markets,
       portfolio,
       trades: sessionId === undefined ? [] : this.trades(100, sessionId),
@@ -651,6 +655,7 @@ export class PolyHunterEngine implements EnginePort {
   public metrics(): string {
     const now = this.now();
     const health = this.health();
+    const feed = this.feedHealth.snapshot(now);
     const lines = [
       '# HELP polyhunter_up Whether the PolyHunter process is serving.',
       '# TYPE polyhunter_up gauge',
@@ -687,7 +692,49 @@ export class PolyHunterEngine implements EnginePort {
       `polyhunter_provider_connected ${health.provider.connected ? 1 : 0}`,
       '# HELP polyhunter_last_book_age_ms Age of the last book update.',
       '# TYPE polyhunter_last_book_age_ms gauge',
-      `polyhunter_last_book_age_ms ${this.lastBookAt === null ? -1 : Math.max(0, now - this.lastBookAt)}`,
+      `polyhunter_last_book_age_ms ${feed.ageMs ?? -1}`,
+      '# HELP polyhunter_book_age_ms Current book age.',
+      '# TYPE polyhunter_book_age_ms gauge',
+      `polyhunter_book_age_ms ${feed.ageMs ?? -1}`,
+      '# HELP polyhunter_book_age_p50_ms Median sampled book age.',
+      '# TYPE polyhunter_book_age_p50_ms gauge',
+      `polyhunter_book_age_p50_ms ${feed.ageP50Ms ?? -1}`,
+      '# HELP polyhunter_book_age_p95_ms P95 sampled book age.',
+      '# TYPE polyhunter_book_age_p95_ms gauge',
+      `polyhunter_book_age_p95_ms ${feed.ageP95Ms ?? -1}`,
+      '# HELP polyhunter_book_age_p99_ms P99 sampled book age.',
+      '# TYPE polyhunter_book_age_p99_ms gauge',
+      `polyhunter_book_age_p99_ms ${feed.ageP99Ms ?? -1}`,
+      '# HELP polyhunter_message_gap_p50_ms Median gap between book arrivals.',
+      '# TYPE polyhunter_message_gap_p50_ms gauge',
+      `polyhunter_message_gap_p50_ms ${feed.gapP50Ms ?? -1}`,
+      '# HELP polyhunter_message_gap_p95_ms P95 gap between book arrivals.',
+      '# TYPE polyhunter_message_gap_p95_ms gauge',
+      `polyhunter_message_gap_p95_ms ${feed.gapP95Ms ?? -1}`,
+      '# HELP polyhunter_message_gap_p99_ms P99 gap between book arrivals.',
+      '# TYPE polyhunter_message_gap_p99_ms gauge',
+      `polyhunter_message_gap_p99_ms ${feed.gapP99Ms ?? -1}`,
+      '# HELP polyhunter_message_gaps Book arrivals observed in the rolling window.',
+      '# TYPE polyhunter_message_gaps gauge',
+      `polyhunter_message_gaps ${feed.messageGaps}`,
+      '# HELP polyhunter_provider_latency_p50_ms Median provider timestamp lag.',
+      '# TYPE polyhunter_provider_latency_p50_ms gauge',
+      `polyhunter_provider_latency_p50_ms ${feed.providerLatencyP50Ms ?? -1}`,
+      '# HELP polyhunter_provider_latency_p95_ms P95 provider timestamp lag.',
+      '# TYPE polyhunter_provider_latency_p95_ms gauge',
+      `polyhunter_provider_latency_p95_ms ${feed.providerLatencyP95Ms ?? -1}`,
+      '# HELP polyhunter_provider_latency_p99_ms P99 provider timestamp lag.',
+      '# TYPE polyhunter_provider_latency_p99_ms gauge',
+      `polyhunter_provider_latency_p99_ms ${feed.providerLatencyP99Ms ?? -1}`,
+      '# HELP polyhunter_provider_reconnects_total Market stream reconnects.',
+      '# TYPE polyhunter_provider_reconnects_total counter',
+      `polyhunter_provider_reconnects_total ${health.provider.reconnectCount}`,
+      '# HELP polyhunter_feed_stale_periods_total Stale periods observed.',
+      '# TYPE polyhunter_feed_stale_periods_total counter',
+      `polyhunter_feed_stale_periods_total ${feed.stalePeriods}`,
+      '# HELP polyhunter_feed_stale_ms_total Total time spent stale.',
+      '# TYPE polyhunter_feed_stale_ms_total counter',
+      `polyhunter_feed_stale_ms_total ${feed.staleMs}`,
       '',
     ];
     return lines.join('\n');
@@ -887,7 +934,6 @@ export class PolyHunterEngine implements EnginePort {
       }
     });
     this.demoStep = 0;
-    this.lastBookAt = now;
   }
 
   private demoTick(): void {
@@ -1012,6 +1058,7 @@ export class PolyHunterEngine implements EnginePort {
   private tick(): void {
     const now = this.now();
     this.updatePortfolio();
+    this.feedHealth.observe(now);
     for (const order of this.broker.openOrders) {
       if (now - order.createdAt > this.config.orderTtlMs) {
         this.broker.cancel(order.id, 'time-to-live expired');
@@ -1112,7 +1159,7 @@ export class PolyHunterEngine implements EnginePort {
     if (this.status !== 'running') {
       return;
     }
-    const reference = this.lastBookAt ?? this.startedAt;
+    const reference = this.feedHealth.lastBook ?? this.startedAt;
     if (reference === null) {
       return;
     }
