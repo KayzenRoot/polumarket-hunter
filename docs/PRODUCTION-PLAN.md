@@ -134,14 +134,14 @@ not confuse it with the production artifact.
 
 ## 6. Gates
 
-| Gate           | Required evidence                                      | Issues                            |
-| -------------- | ------------------------------------------------------ | --------------------------------- |
-| G0 Contract    | Contract approved by owner                             | #15 — closed 2026-10-26           |
-| G1 Correctness | Tick/session/fault tests green; CI green               | #16, #17, #19 — closed 2026-10-26 |
-| G2 Evidence    | 3 validated sessions, baselines, decision memo         | #27, #28, #30 closed; #29 open    |
-| G3 Operations  | Doctor, retention/backup, report, control audit        | #18, #20–#26                      |
-| G4 Release     | Windows CI, Docker, SBOM/checksums, clean runbook      | #31–#35                           |
-| G5 Sign-off    | Owner approval; release naming decision; no open P0/P1 | all P0/P1                         |
+| Gate           | Required evidence                                      | Issues                                |
+| -------------- | ------------------------------------------------------ | ------------------------------------- |
+| G0 Contract    | Contract approved by owner                             | #15 — closed 2026-10-26               |
+| G1 Correctness | Tick/session/fault tests green; CI green               | #16, #17, #19 — closed 2026-10-26     |
+| G2 Evidence    | 3 validated sessions, baselines, decision memo         | #27, #28, #30 closed; #29 owner-gated |
+| G3 Operations  | Doctor, retention/backup, report, control audit        | #18, #20–#26 — closed 2026-10-26      |
+| G4 Release     | Windows CI, Docker, SBOM/checksums, clean runbook      | #31, #33, #34 closed; #32, #35 open   |
+| G5 Sign-off    | Owner approval; release naming decision; no open P0/P1 | all P0/P1                             |
 
 A gate is not “mostly done”. It is open until every required issue is closed with evidence.
 
@@ -191,20 +191,23 @@ Do not compress the evidence gate to hit a date.
 
 As of 2026-10-26:
 
-- v0.1.0 production: **18 open**, 7 closed (#15, #16, #17, #19, #27, #28, #30).
+- v0.1.0 production: **7 open**, 18 closed (#15–#28 except #29, plus #30, #31, #33, #34).
 - v0.1.x hardening: **6 open**.
 - v0.2.0 live readiness: **6 open, blocked**.
-- Current gate: **G2 — evidence**. Tooling is complete; #29 needs owner time and approval.
+- Current gates: **G2 evidence + G4 release**, both owner-gated. G3 is closed.
 
 ## 11. Next action
 
-1. Record three independent sessions at different times/regimes, validate each one, and run the
-   research harness with an explicit fee assumption.
-2. Publish `docs/research/v0.1-evidence.md` with train/validation metrics, both baselines, fees,
-   drawdown and fill rate.
-3. Ask the owner to approve or reject the go/no-go recommendation; do not fabricate a session or
-   tune on validation.
-4. Wave 3 operations work (#18, #20–#26) can proceed in parallel, but G2 stays open until #29 has
-   three validated recordings and an approved memo.
+1. **#29 evidence:** record three independent sessions at different times/regimes, validate each,
+   run the research harness with an explicit fee assumption, publish
+   `docs/research/v0.1-evidence.md`, and ask the owner for go/no-go.
+2. **#32 runbook:** run the full flow on a clean Windows machine, store evidence under
+   `docs/evidence/`, and file any undocumented step as a new issue.
+3. **#35 reviewer:** install one AI reviewer app (owner GitHub session).
+4. **G5:** after #29/#32/#35 close, cut a signed `v*` tag. The release workflow produces the
+   artifact, CycloneDX SBOM and SHA256SUMS. See
+   `docs/evidence/release-dry-run-2026-10-26.md` for the validated dry run.
+
+Do not cut a production tag before the #29 memo exists and the owner approves the recommendation.
 
 The first production PR should be small and boring. That is the point.
