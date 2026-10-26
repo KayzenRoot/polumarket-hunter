@@ -37,6 +37,8 @@ The workflow:
 - prunes dev dependencies and packages
   `polyhunter-<tag>-linux-x64.tar.gz` with deterministic tar metadata;
 - writes and verifies `SHA256SUMS`;
+- extracts the tarball in a temp directory and checks `/api/health`, the dashboard, kill and reset
+  before publishing;
 - publishes the release with notes linking the contract, plan, runbook, fees and research memo.
 
 Re-running the workflow for the same tag uploads assets with `--clobber` and updates the notes. Only
