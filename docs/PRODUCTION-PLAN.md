@@ -1,8 +1,8 @@
 # Production plan — v0.1.0 paper-first
 
-Status: **DRAFT — awaiting owner approval of the production contract**
+Status: **APPROVED — execution starts at G1**
 Plan date: 2026-10-26
-Baseline commit: `99334fa`
+Baseline commit: `a926e92`
 Milestone: [v0.1.0 - Production (paper-first)](https://github.com/KayzenRoot/polumarket-hunter/milestone/1)
 
 ## 1. Definition of done
@@ -125,24 +125,23 @@ owner authorization. Do not start them because the dashboard looks ready.
 The current `v0.1.0` tag/release is a **bootstrap preview**, created before the production gate.
 It must not be presented as the production release.
 
-At the release gate, choose one:
+**Decision (2026-10-26): Option A.** With owner approval, delete the preview tag/release and recreate
+`v0.1.0` on the production commit at G4. This requires a temporary, explicit tag-ruleset exception.
+A protected tag is never moved silently.
 
-- **Option A (preferred):** with owner approval, delete the preview tag/release and recreate
-  `v0.1.0` on the production commit. This requires a temporary, explicit tag-ruleset exception.
-- **Option B:** keep the preview and ship production as `v0.1.1`.
-
-This decision must be recorded before #34 closes. Do not silently move a protected tag.
+The existing `v0.1.0` release must be marked as a pre-release until it is replaced, so consumers do
+not confuse it with the production artifact.
 
 ## 6. Gates
 
-| Gate           | Required evidence                                      | Issues             |
-| -------------- | ------------------------------------------------------ | ------------------ |
-| G0 Contract    | Contract approved by owner                             | #15                |
-| G1 Correctness | Tick/session/fault tests green; CI green               | #16, #17, #19      |
-| G2 Evidence    | 3 validated sessions, baselines, decision memo         | #27, #28, #29, #30 |
-| G3 Operations  | Doctor, retention/backup, report, control audit        | #18, #20–#26       |
-| G4 Release     | Windows CI, Docker, SBOM/checksums, clean runbook      | #31–#35            |
-| G5 Sign-off    | Owner approval; release naming decision; no open P0/P1 | all P0/P1          |
+| Gate           | Required evidence                                      | Issues                  |
+| -------------- | ------------------------------------------------------ | ----------------------- |
+| G0 Contract    | Contract approved by owner                             | #15 — closed 2026-10-26 |
+| G1 Correctness | Tick/session/fault tests green; CI green               | #16, #17, #19           |
+| G2 Evidence    | 3 validated sessions, baselines, decision memo         | #27, #28, #29, #30      |
+| G3 Operations  | Doctor, retention/backup, report, control audit        | #18, #20–#26            |
+| G4 Release     | Windows CI, Docker, SBOM/checksums, clean runbook      | #31–#35                 |
+| G5 Sign-off    | Owner approval; release naming decision; no open P0/P1 | all P0/P1               |
 
 A gate is not “mostly done”. It is open until every required issue is closed with evidence.
 
@@ -192,16 +191,16 @@ Do not compress the evidence gate to hit a date.
 
 As of 2026-10-26:
 
-- v0.1.0 production: **25 open**, 0 closed.
+- v0.1.0 production: **24 open**, 1 closed (#15).
 - v0.1.x hardening: **6 open**.
 - v0.2.0 live readiness: **6 open, blocked**.
-- Current gate: **G0 — contract approval**.
+- Current gate: **G1 — correctness**.
 
 ## 11. Next action
 
-1. Review and approve [PRODUCTION-CONTRACT.md](PRODUCTION-CONTRACT.md) in issue #15.
-2. Create the #15 PR (this document + contract + README link).
-3. Start #16 on a branch from `main`.
+1. Create the #16 branch `feat/issue-16-tick-size` from `main`.
+2. Implement per-market tick size in core strategy, paper execution and tick-size-change handling.
+3. Add tests for 0.001 and 0.01 ticks; run `npm run ci`.
 4. Do not start #17 until #16 is merged, unless the owner explicitly accepts the conflict risk.
 
 The first production PR should be small and boring. That is the point.
