@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.1.1 — 2026-10-27
+
+### Added
+
+- OpenAPI 3.0.3 contract served at `/openapi.json`, with route coverage, snapshot tests and
+  `docs/API.md`.
+- Axe accessibility, keyboard navigation and 390px mobile Playwright coverage.
+- systemd, logrotate and Windows Task Scheduler supervisor recipes with configuration tests.
+- Packaged-artifact smoke test in the release workflow: health, dashboard, kill and reset before
+  publishing.
+- npm audit gate with time-bounded owner exceptions in `security/audit-exceptions.json`.
+- Hash-pinned Semgrep requirements and digest-pinned Docker base images.
+- `docs/DEPENDENCY-POLICY.md`, `docs/SUPERVISOR.md` and the solo-owner review decision.
+
+### Changed
+
+- Raised the faint-label contrast to WCAG AA (`#7c93a8`).
+- Tightened the release workflow top-level token to `contents: read`; write is scoped to the release
+  job.
+- Corrected the release runbook's extraction and working-directory instructions.
+- Documented the two accepted medium Python scanner advisories; they are scanner-only and dismissed
+  as tolerable risk.
+
+### Safety
+
+- Live execution is not implemented and fails closed.
+- No wallet, private key, seed phrase, API secret or geoblock bypass is included.
+- The paper strategy has no verified edge; no profitability claim is made.
+
 ## 0.1.0 — 2026-10-26
 
 ### Added

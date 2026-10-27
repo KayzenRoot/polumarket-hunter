@@ -14,12 +14,14 @@ checksums. The `release` workflow runs on any `v*` tag.
 
 ## Cut a release
 
+The commands below use `v0.1.1`; substitute the tag you are cutting.
+
 ```bash
 git switch main
 git pull --ff-only
 npm run verify
-git tag -s v0.1.0 -m "PolyHunter v0.1.0"
-git push origin v0.1.0
+git tag -s v0.1.1 -m "PolyHunter v0.1.1"
+git push origin v0.1.1
 ```
 
 Use an annotated signed tag when possible. If no signing key is available, use an annotated tag and
@@ -58,9 +60,9 @@ artifact; it does not create a release.
 
 ```bash
 sha256sum -c SHA256SUMS
-mkdir polyhunter-v0.1.0
-tar -xzf polyhunter-v0.1.0-linux-x64.tar.gz -C polyhunter-v0.1.0
-cd polyhunter-v0.1.0
+mkdir polyhunter-v0.1.1
+tar -xzf polyhunter-v0.1.1-linux-x64.tar.gz -C polyhunter-v0.1.1
+cd polyhunter-v0.1.1
 cp .env.example .env
 # edit DATABASE_PATH / RECORD_DIR / API_TOKEN as needed
 node apps/server/dist/main.js
