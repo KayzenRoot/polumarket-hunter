@@ -56,7 +56,7 @@ export const OPENAPI_DOCUMENT = {
   openapi: '3.0.3',
   info: {
     title: 'PolyHunter API',
-    version: '0.1.0',
+    version: '0.1.1',
     description:
       'Local, single-user, paper-first prediction-market research terminal. No live order endpoint, no wallet and no geoblock bypass. Responses use the {ok, data} or {ok, error} envelope.',
   },

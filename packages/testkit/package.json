@@ -1,6 +1,6 @@
 {
   "name": "@polyhunter/testkit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Deterministic builders and fixtures shared by PolyHunter tests.",
@@ -16,6 +16,6 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@polyhunter/core": "0.1.0"
+    "@polyhunter/core": "0.1.1"
   }
 }
