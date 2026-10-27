@@ -20,7 +20,7 @@ It is **not** a promise of profit. It is a production-quality research terminal.
 | Item       | State                                                                       |
 | ---------- | --------------------------------------------------------------------------- |
 | Repository | Public, `main` protected by ruleset                                         |
-| Release    | `v0.1.0` production, annotated tag on `9170a07`, published 2026-10-26       |
+| Release    | `v0.1.0` production 2026-10-26; `v0.1.1` patch 2026-10-27                   |
 | Tests      | 165 passing                                                                 |
 | Coverage   | 87.01% statements / 76.25% branches / 90.82% functions / 86.86% lines       |
 | CI         | Quality, Windows, E2E and Docker green at `9170a07`                         |
@@ -194,13 +194,13 @@ Do not compress the evidence gate to hit a date.
 
 ## 10. Status dashboard
 
-As of 2026-10-26:
+As of 2026-10-27:
 
 - v0.1.0 production: **0 open**, 25 closed (epics #10 and #13 closed; #11/#12 earlier).
-- v0.1.x hardening: **0 open**, 8 closed (#36–#41, #82, #88).
+- v0.1.x hardening: **0 open**, 8 closed (#36–#41, #82, #88); `v0.1.1` published 2026-10-27.
 - v0.2.0 live readiness: **6 open, blocked** (#14, #42–#46).
-- Current gate: **G5 closed 2026-10-26**. `v0.1.0` is published and verified; the v0.1.x hardening
-  changes are on `main` and are ready for a patch release when the owner chooses.
+- Current gate: **G5 closed 2026-10-26**. `v0.1.0` and the `v0.1.1` patch are published and
+  verified.
 
 ## 11. Next action
 
@@ -209,8 +209,8 @@ pre-registered metric and a fresh out-of-sample session, or a separate, explicit
 live-readiness decision. Do not enable live trading. The evidence memo keeps v0.1.0 paper-only and
 makes no edge claim.
 
-The release workflow now uses a read-only top-level token and grants `contents: write` only to the
-release job. The published `v0.1.0` workflow used the previous top-level write scope; the release
-assets are unaffected, and the tighter scope applies to future releases.
+The release workflow uses a read-only top-level token and grants `contents: write` only to the
+release job. `v0.1.1` used the tighter scope; the original `v0.1.0` workflow used the previous
+top-level write permission.
 
 The first production PR should be small and boring. That is the point.

@@ -93,7 +93,7 @@ source install or the Docker runtime.
 Record the tag object, release URL, workflow run, asset SHA256 values and the Linux smoke result in
 `docs/evidence/release-<tag>-<date>.md`. Verify `sha256sum -c SHA256SUMS` from the downloaded
 assets, start the server from the extracted root, and check `/api/health` and `/` (the dashboard,
-not the API fallback). See `docs/evidence/release-v0.1.0-2026-10-26.md`.
+not the API fallback). See `docs/evidence/release-v0.1.1-2026-10-27.md` for the current example.
 
 ## Release notes and limitations
 
