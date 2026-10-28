@@ -2,8 +2,9 @@ services:
   polyhunter:
     build: .
     image: polyhunter:local
+    # Loopback only. Use Tailscale Serve or a TLS reverse proxy for remote access.
     ports:
-      - '8787:8787'
+      - '127.0.0.1:8787:8787'
     environment:
       HOST: 0.0.0.0
       PORT: 8787

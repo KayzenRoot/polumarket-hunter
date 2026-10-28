@@ -91,7 +91,8 @@ VPN/proxy bypass and no signing code in the repository.
 The HTTP contract is documented in [docs/API.md](docs/API.md) and
 [docs/openapi.json](docs/openapi.json); the running server exposes it at `/openapi.json`. For
 systemd/Task Scheduler autostart, restart and log rotation, see
-[docs/SUPERVISOR.md](docs/SUPERVISOR.md).
+[docs/SUPERVISOR.md](docs/SUPERVISOR.md). For an AWS VPS in the client's eligible region with
+Tailscale used only for private inbound access, see [docs/DEPLOY-AWS.md](docs/DEPLOY-AWS.md).
 
 ## Architecture
 
