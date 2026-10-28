@@ -1,7 +1,9 @@
 import { makeBook, makePosition } from '@polyhunter/testkit';
 import { describe, expect, it } from 'vitest';
 import {
+  createStrategy,
   DEFAULT_STRATEGY_CONFIG,
+  MakerScalperStrategy,
   MicroMakerStrategy,
   MomentumTakerStrategy,
   type StrategyConfig,
@@ -176,6 +178,103 @@ describe('micro maker strategy', () => {
 
     expect(intent.action).toBe('HOLD');
     expect(intent.reasons.join(' ')).toContain('position open');
+  });
+});
+
+describe('maker scalper strategy', () => {
+  it('quotes a maker bid when the entry checks agree', () => {
+    const strategy = new MakerScalperStrategy(config);
+    const intent = strategy.evaluate(imbalancedBook(), {
+      now: 1_000_000,
+      position: null,
+      lastEntryAt: null,
+    });
+
+    expect(intent.action).toBe('PLACE_BID');
+    expect(intent.price).toBe(0.48);
+  });
+
+  it('places a maker ask at the fee-aware profit target', () => {
+    const strategy = new MakerScalperStrategy({ ...config, takeProfitEdge: 0.012 });
+    const position = makePosition({ avgPrice: 0.5, shares: 20 });
+    const intent = strategy.evaluate(
+      makeBook({
+        bids: [{ price: 0.49, size: 300 }],
+        asks: [{ price: 0.52, size: 300 }],
+      }),
+      { now: 1_000_000, position, lastEntryAt: null, hasOpenOrder: false },
+    );
+
+    expect(intent.action).toBe('PLACE_ASK');
+    expect(intent.price).toBe(0.52);
+    expect(intent.size).toBe(20);
+    expect(intent.reasons.join(' ')).toContain('maker take-profit');
+  });
+
+  it('waits while a maker exit is resting', () => {
+    const strategy = new MakerScalperStrategy(config);
+    const position = makePosition({ avgPrice: 0.5, shares: 20 });
+    const intent = strategy.evaluate(
+      makeBook({
+        bids: [{ price: 0.49, size: 300 }],
+        asks: [{ price: 0.52, size: 300 }],
+      }),
+      { now: 1_000_000, position, lastEntryAt: null, hasOpenOrder: true },
+    );
+
+    expect(intent.action).toBe('HOLD');
+    expect(intent.reasons.join(' ')).toContain('exit resting');
+  });
+
+  it('uses a taker stop as the safety valve', () => {
+    const strategy = new MakerScalperStrategy(config);
+    const position = makePosition({ avgPrice: 0.5, shares: 20 });
+    const intent = strategy.evaluate(
+      makeBook({
+        bids: [{ price: 0.48, size: 300 }],
+        asks: [{ price: 0.5, size: 300 }],
+      }),
+      { now: 1_000_000, position, lastEntryAt: null, hasOpenOrder: false },
+    );
+
+    expect(intent.action).toBe('TAKE_SELL');
+    expect(intent.reasons.join(' ')).toContain('stop loss');
+  });
+
+  it('uses a taker exit when the maker edge decays', () => {
+    const strategy = new MakerScalperStrategy({
+      ...config,
+      minEdge: 0.006,
+      stopLossEdge: 0.05,
+    });
+    const position = makePosition({ avgPrice: 0.5, shares: 20 });
+    const intent = strategy.evaluate(
+      makeBook({
+        bids: [{ price: 0.48, size: 300 }],
+        asks: [{ price: 0.49, size: 300 }],
+      }),
+      { now: 1_000_000, position, lastEntryAt: null, hasOpenOrder: false },
+    );
+
+    expect(intent.action).toBe('TAKE_SELL');
+    expect(intent.reasons.join(' ')).toContain('edge decayed');
+  });
+
+  it('waits while a maker entry is resting', () => {
+    const strategy = new MakerScalperStrategy(config);
+    const intent = strategy.evaluate(imbalancedBook(), {
+      now: 1_000_000,
+      position: null,
+      lastEntryAt: null,
+      hasOpenOrder: true,
+    });
+
+    expect(intent.action).toBe('HOLD');
+    expect(intent.reasons.join(' ')).toContain('entry resting');
+  });
+
+  it('is created from the strategy kind', () => {
+    expect(createStrategy('maker-scalper', config).kind).toBe('maker-scalper');
   });
 });
 

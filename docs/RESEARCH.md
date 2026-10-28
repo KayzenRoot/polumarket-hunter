@@ -27,7 +27,7 @@ train simulation. It answers “how would this frozen configuration have behaved
 | ------------------ | ---------------- | -------------------------------------------------- |
 | `--file`           | required         | JSONL recording                                    |
 | `--out`            | `data/reports`   | Output directory                                   |
-| `--strategy`       | `micro-maker`    | `micro-maker` or `momentum-taker`                  |
+| `--strategy`       | `micro-maker`    | `micro-maker`, `maker-scalper` or `momentum-taker` |
 | `--cash`           | `1000`           | Starting cash per split                            |
 | `--fee-bps`        | `0`              | Flat fallback fee when no rate is supplied         |
 | `--fee-rate`       | none             | Taker rate for the venue curve, e.g. `0.05`        |
@@ -43,6 +43,13 @@ train simulation. It answers “how would this frozen configuration have behaved
 
 The risk limits, tick size, momentum horizon, cooldown, order notional and order TTL stay at their
 defaults. Change them in code only through a reviewed PR so the config hash stays meaningful.
+
+### maker-scalper
+
+`maker-scalper` is the fee-aware exit hypothesis. It quotes a maker bid for entry and a maker ask for
+the profit target. A taker sell remains only as a stop-loss or edge-decay safety valve. With a
+taker-only fee schedule, the maker exit pays zero; `--take-profit` is the gross target above the
+average entry. This is a research variant, not the default and not evidence of edge.
 
 ## Fees
 

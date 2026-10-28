@@ -64,7 +64,7 @@ const envSchema = z.object({
       .optional(),
   ),
 
-  STRATEGY: z.enum(['micro-maker', 'momentum-taker']).default('micro-maker'),
+  STRATEGY: z.enum(['micro-maker', 'maker-scalper', 'momentum-taker']).default('micro-maker'),
   STARTING_CASH: numberish.pipe(z.number().positive()).default(1_000),
   ORDER_NOTIONAL: numberish.pipe(z.number().positive()).default(10),
   MIN_EDGE: numberish.pipe(z.number().min(0).max(1)).default(0.006),

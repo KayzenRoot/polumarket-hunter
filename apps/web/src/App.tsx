@@ -26,6 +26,17 @@ import { TopBar } from './components/TopBar.js';
 import { TradesTable } from './components/TradesTable.js';
 import { useDashboard, useMarketDetail } from './useDashboard.js';
 
+function strategyLabel(strategy: StateResponse['config']['strategy']): string {
+  switch (strategy) {
+    case 'micro-maker':
+      return 'Micro Maker Scalper';
+    case 'maker-scalper':
+      return 'Maker Scalper';
+    case 'momentum-taker':
+      return 'Momentum Taker';
+  }
+}
+
 function ErrorBanner({
   title,
   message,
@@ -102,7 +113,7 @@ function ConfigCard({ state }: { state: StateResponse }) {
       <div className="card-head">
         <div>
           <span className="eyebrow">Configuration</span>
-          <h2>{config.strategy === 'micro-maker' ? 'Micro Maker Scalper' : 'Momentum Taker'}</h2>
+          <h2>{strategyLabel(config.strategy)}</h2>
         </div>
         <StatusPill tone="info" dot={false}>
           {config.demoMode ? 'DEMO' : 'PAPER'}

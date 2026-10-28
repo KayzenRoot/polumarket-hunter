@@ -1,7 +1,7 @@
 export type Side = 'BUY' | 'SELL';
 export type Outcome = 'YES' | 'NO';
 export type TradingMode = 'paper' | 'live';
-export type StrategyKind = 'micro-maker' | 'momentum-taker';
+export type StrategyKind = 'micro-maker' | 'maker-scalper' | 'momentum-taker';
 
 export type StrategyAction = 'HOLD' | 'PLACE_BID' | 'PLACE_ASK' | 'TAKE_BUY' | 'TAKE_SELL';
 
@@ -120,6 +120,7 @@ export interface StrategyContext {
   readonly now: number;
   readonly position: Position | null;
   readonly lastEntryAt: number | null;
+  readonly hasOpenOrder?: boolean;
 }
 
 export interface StrategyIntent {

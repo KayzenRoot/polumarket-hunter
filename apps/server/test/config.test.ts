@@ -34,6 +34,11 @@ describe('server configuration', () => {
     expect(config.strategy).toBe('momentum-taker');
   });
 
+  it('accepts the maker-scalper research strategy', () => {
+    const config = loadConfig({ NODE_ENV: 'test', STRATEGY: 'maker-scalper' });
+    expect(config.strategy).toBe('maker-scalper');
+  });
+
   it('rejects an invalid port', () => {
     expect(() => loadConfig({ NODE_ENV: 'test', PORT: '70000' })).toThrow(
       /invalid PolyHunter configuration/,

@@ -12,15 +12,10 @@ import {
   researchConfigJson,
   runResearch,
   type StrategyConfig,
-  type StrategyKind,
   validateRecording,
 } from '../packages/core/src/index.js';
-import { numberOption } from './args.js';
+import { numberOption, strategyOption } from './args.js';
 import { type FeeSelection, feeSelection } from './fees.js';
-
-function strategyOption(value: string | boolean | undefined): StrategyKind {
-  return value === 'micro-maker' ? 'micro-maker' : 'momentum-taker';
-}
 
 const { values } = parseArgs({
   options: {
@@ -44,7 +39,7 @@ const { values } = parseArgs({
 
 if (typeof values.file !== 'string') {
   console.error(
-    'Usage: npm run research -- --file data/recordings/polyhunter-YYYY-MM-DD.jsonl [--strategy micro-maker]',
+    'Usage: npm run research -- --file data/recordings/polyhunter-YYYY-MM-DD.jsonl [--strategy micro-maker|maker-scalper|momentum-taker]',
   );
   process.exit(1);
 }

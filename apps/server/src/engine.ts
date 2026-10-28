@@ -540,6 +540,9 @@ export class PolyHunterEngine implements EnginePort {
       now: this.now(),
       position: this.broker.positionForToken(book.tokenId),
       lastEntryAt: this.lastEntryAt.get(book.tokenId) ?? null,
+      hasOpenOrder:
+        this.broker.hasOpenOrder(book.tokenId, 'BUY') ||
+        this.broker.hasOpenOrder(book.tokenId, 'SELL'),
     });
     this.decisions.set(book.tokenId, intent);
     this.updatePortfolio();
