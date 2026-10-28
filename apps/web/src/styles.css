@@ -638,6 +638,14 @@ button:disabled {
   letter-spacing: -0.01em;
 }
 
+.card-head-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .card-risk {
   padding: 0;
   overflow: hidden;

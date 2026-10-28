@@ -115,9 +115,14 @@ function ConfigCard({ state }: { state: StateResponse }) {
           <span className="eyebrow">Configuration</span>
           <h2>{strategyLabel(config.strategy)}</h2>
         </div>
-        <StatusPill tone="info" dot={false}>
-          {config.demoMode ? 'DEMO' : 'PAPER'}
-        </StatusPill>
+        <div className="card-head-tags">
+          <StatusPill tone="warning" dot={false}>
+            UNVALIDATED
+          </StatusPill>
+          <StatusPill tone="info" dot={false}>
+            {config.demoMode ? 'DEMO' : 'PAPER'}
+          </StatusPill>
+        </div>
       </div>
       <dl className="config-grid">
         <div>
@@ -163,7 +168,8 @@ function ConfigCard({ state }: { state: StateResponse }) {
       </dl>
       <p className="config-note">
         These values come from the server configuration and are read-only here. Live execution is
-        not implemented; every order is a paper order.
+        not implemented; every order is a paper order. The strategy is a research configuration with
+        no verified edge; paper results are not predictive or investment advice.
       </p>
     </section>
   );
