@@ -7,13 +7,8 @@ import {
   generateSyntheticBooks,
   runBacktest,
   type StrategyConfig,
-  type StrategyKind,
 } from '../packages/core/src/index.js';
-import { numberOption } from './args.js';
-
-function strategyOption(value: string | boolean | undefined): StrategyKind {
-  return value === 'micro-maker' ? 'micro-maker' : 'momentum-taker';
-}
+import { numberOption, strategyOption } from './args.js';
 
 const { values } = parseArgs({
   options: {

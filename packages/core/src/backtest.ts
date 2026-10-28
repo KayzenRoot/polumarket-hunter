@@ -140,6 +140,8 @@ export function runBacktest(options: BacktestOptions): BacktestResult {
       now,
       position,
       lastEntryAt: lastEntryAt.get(book.tokenId) ?? null,
+      hasOpenOrder:
+        broker.hasOpenOrder(book.tokenId, 'BUY') || broker.hasOpenOrder(book.tokenId, 'SELL'),
     });
 
     if (intent.action !== 'HOLD') {

@@ -179,24 +179,111 @@ function baseEntryChecks(
   return reasons;
 }
 
-export class MicroMakerStrategy implements Strategy {
-  public readonly kind: StrategyKind = 'micro-maker';
-  private readonly config: StrategyConfig;
+function makerEntryIntent(
+  book: OrderBook,
+  top: TopOfBook,
+  config: StrategyConfig,
+  context: StrategyContext,
+): StrategyIntent {
+  const imbalance = orderBookImbalance(top);
+  const fair = top.microprice;
+  const edgeAtBid = roundPrice(fair - top.bid);
+  const depth = depthShares(book, 'BUY', 3);
+  const confidence = confidenceFor(edgeAtBid, imbalance, depth, config);
+  const rejections = baseEntryChecks(book, top, config, context, 'BUY');
 
-  public constructor(config: StrategyConfig) {
+  if (imbalance < config.minImbalance) {
+    rejections.push(`imbalance ${imbalance.toFixed(3)} < min ${config.minImbalance}`);
+  }
+  if (edgeAtBid < config.minEdge) {
+    rejections.push(`edge at bid ${edgeAtBid.toFixed(4)} < min ${config.minEdge}`);
+  }
+  if (rejections.length > 0) {
+    return hold(book, top, fair, edgeAtBid, confidence, rejections, context.now);
+  }
+
+  const tickSize = tickSizeFor(book, config);
+  const improvedBid = roundToTick(top.bid + tickSize, tickSize);
+  const price =
+    improvedBid < top.ask && roundPrice(fair - improvedBid) >= config.minEdge
+      ? improvedBid
+      : top.bid;
+  const size = sizeForNotional(config.orderNotional, price);
+
+  if (size <= 0) {
+    return hold(
+      book,
+      top,
+      fair,
+      edgeAtBid,
+      confidence,
+      ['order notional is too small for the current price'],
+      context.now,
+    );
+  }
+
+  return {
+    action: 'PLACE_BID',
+    tokenId: book.tokenId,
+    marketId: book.marketId,
+    outcome: book.outcome,
+    price,
+    size,
+    fairValue: fair,
+    edge: roundPrice(fair - price),
+    confidence,
+    reasons: [
+      `microprice edge ${roundPrice(fair - price).toFixed(4)} >= ${config.minEdge}`,
+      `imbalance ${imbalance.toFixed(3)} >= ${config.minImbalance}`,
+      `depth ${depth.toFixed(2)} >= ${config.minDepthShares}`,
+    ],
+    createdAt: context.now,
+  };
+}
+
+abstract class BaseStrategy implements Strategy {
+  public abstract readonly kind: StrategyKind;
+  protected readonly config: StrategyConfig;
+
+  protected constructor(config: StrategyConfig) {
     this.config = config;
   }
 
-  public evaluate(book: OrderBook, context: StrategyContext): StrategyIntent {
+  public abstract evaluate(book: OrderBook, context: StrategyContext): StrategyIntent;
+
+  public reset(): void {
+    // Stateless by default.
+  }
+
+  protected prepare(
+    book: OrderBook,
+    context: StrategyContext,
+  ): { readonly top: TopOfBook } | { readonly intent: StrategyIntent } {
     const top = topOfBook(book);
     if (top === null) {
-      return hold(book, null, 0, 0, 0, ['order book is empty'], context.now);
+      return { intent: hold(book, null, 0, 0, 0, ['order book is empty'], context.now) };
     }
-
     const usability = isBookUsable(book, this.config.maxBookAgeMs, context.now);
     if (!usability.ok) {
-      return unusable(book, top, top.microprice, context.now, usability);
+      return { intent: unusable(book, top, top.microprice, context.now, usability) };
     }
+    return { top };
+  }
+}
+
+export class MicroMakerStrategy extends BaseStrategy {
+  public readonly kind: StrategyKind = 'micro-maker';
+
+  public constructor(config: StrategyConfig) {
+    super(config);
+  }
+
+  public evaluate(book: OrderBook, context: StrategyContext): StrategyIntent {
+    const prepared = this.prepare(book, context);
+    if ('intent' in prepared) {
+      return prepared.intent;
+    }
+    const { top } = prepared;
 
     if (context.position !== null && context.position.shares > 0) {
       const exit = exitIntent(book, top, context.position, this.config, context.now);
@@ -214,64 +301,121 @@ export class MicroMakerStrategy implements Strategy {
       );
     }
 
-    const imbalance = orderBookImbalance(top);
-    const fair = top.microprice;
-    const edgeAtBid = roundPrice(fair - top.bid);
-    const depth = depthShares(book, 'BUY', 3);
-    const confidence = confidenceFor(edgeAtBid, imbalance, depth, this.config);
-    const rejections = baseEntryChecks(book, top, this.config, context, 'BUY');
+    return makerEntryIntent(book, top, this.config, context);
+  }
+}
 
-    if (imbalance < this.config.minImbalance) {
-      rejections.push(`imbalance ${imbalance.toFixed(3)} < min ${this.config.minImbalance}`);
+export class MakerScalperStrategy extends BaseStrategy {
+  public readonly kind: StrategyKind = 'maker-scalper';
+
+  public constructor(config: StrategyConfig) {
+    super(config);
+  }
+
+  public evaluate(book: OrderBook, context: StrategyContext): StrategyIntent {
+    const prepared = this.prepare(book, context);
+    if ('intent' in prepared) {
+      return prepared.intent;
     }
-    if (edgeAtBid < this.config.minEdge) {
-      rejections.push(`edge at bid ${edgeAtBid.toFixed(4)} < min ${this.config.minEdge}`);
-    }
-    if (rejections.length > 0) {
-      return hold(book, top, fair, edgeAtBid, confidence, rejections, context.now);
+    const { top } = prepared;
+    const position = context.position;
+    if (position !== null && position.shares > 0) {
+      const pnlPerShare = roundPrice(top.bid - position.avgPrice);
+      if (context.hasOpenOrder === true) {
+        return hold(
+          book,
+          top,
+          top.microprice,
+          pnlPerShare,
+          0.5,
+          ['maker exit resting; waiting for fill or cancellation'],
+          context.now,
+        );
+      }
+
+      if (pnlPerShare <= -this.config.stopLossEdge) {
+        return {
+          action: 'TAKE_SELL',
+          tokenId: book.tokenId,
+          marketId: book.marketId,
+          outcome: book.outcome,
+          price: top.bid,
+          size: roundSize(position.shares),
+          fairValue: top.microprice,
+          edge: pnlPerShare,
+          confidence: 1,
+          reasons: [
+            `maker stop loss: bid ${top.bid.toFixed(3)} <= avg ${position.avgPrice.toFixed(3)} - ${this.config.stopLossEdge.toFixed(3)}`,
+          ],
+          createdAt: context.now,
+        };
+      }
+
+      if (top.microprice <= position.avgPrice - this.config.minEdge) {
+        return {
+          action: 'TAKE_SELL',
+          tokenId: book.tokenId,
+          marketId: book.marketId,
+          outcome: book.outcome,
+          price: top.bid,
+          size: roundSize(position.shares),
+          fairValue: top.microprice,
+          edge: pnlPerShare,
+          confidence: 0.7,
+          reasons: [
+            `maker edge decayed: microprice ${top.microprice.toFixed(4)} < avg ${position.avgPrice.toFixed(3)} - ${this.config.minEdge}`,
+          ],
+          createdAt: context.now,
+        };
+      }
+
+      const tickSize = tickSizeFor(book, this.config);
+      const target = roundToTick(
+        Math.max(top.ask, roundPrice(position.avgPrice + this.config.takeProfitEdge)),
+        tickSize,
+      );
+      if (target <= top.bid) {
+        return hold(
+          book,
+          top,
+          top.microprice,
+          pnlPerShare,
+          0.5,
+          ['maker target is already marketable; waiting for a better book'],
+          context.now,
+        );
+      }
+
+      return {
+        action: 'PLACE_ASK',
+        tokenId: book.tokenId,
+        marketId: book.marketId,
+        outcome: book.outcome,
+        price: target,
+        size: roundSize(position.shares),
+        fairValue: top.microprice,
+        edge: roundPrice(target - position.avgPrice),
+        confidence: 0.8,
+        reasons: [
+          `maker take-profit target ${target.toFixed(3)} >= avg ${position.avgPrice.toFixed(3)} + ${this.config.takeProfitEdge.toFixed(3)}`,
+        ],
+        createdAt: context.now,
+      };
     }
 
-    const tickSize = tickSizeFor(book, this.config);
-    const improvedBid = roundToTick(top.bid + tickSize, tickSize);
-    const price =
-      improvedBid < top.ask && roundPrice(fair - improvedBid) >= this.config.minEdge
-        ? improvedBid
-        : top.bid;
-    const size = sizeForNotional(this.config.orderNotional, price);
-
-    if (size <= 0) {
+    if (context.hasOpenOrder === true) {
       return hold(
         book,
         top,
-        fair,
-        edgeAtBid,
-        confidence,
-        ['order notional is too small for the current price'],
+        top.microprice,
+        0,
+        0,
+        ['maker entry resting; waiting for fill or cancellation'],
         context.now,
       );
     }
 
-    return {
-      action: 'PLACE_BID',
-      tokenId: book.tokenId,
-      marketId: book.marketId,
-      outcome: book.outcome,
-      price,
-      size,
-      fairValue: fair,
-      edge: roundPrice(fair - price),
-      confidence,
-      reasons: [
-        `microprice edge ${roundPrice(fair - price).toFixed(4)} >= ${this.config.minEdge}`,
-        `imbalance ${imbalance.toFixed(3)} >= ${this.config.minImbalance}`,
-        `depth ${depth.toFixed(2)} >= ${this.config.minDepthShares}`,
-      ],
-      createdAt: context.now,
-    };
-  }
-
-  public reset(): void {
-    // Stateless.
+    return makerEntryIntent(book, top, this.config, context);
   }
 }
 
@@ -281,25 +425,20 @@ interface MomentumState {
   initialized: boolean;
 }
 
-export class MomentumTakerStrategy implements Strategy {
+export class MomentumTakerStrategy extends BaseStrategy {
   public readonly kind: StrategyKind = 'momentum-taker';
-  private readonly config: StrategyConfig;
   private readonly states = new Map<string, MomentumState>();
 
   public constructor(config: StrategyConfig) {
-    this.config = config;
+    super(config);
   }
 
   public evaluate(book: OrderBook, context: StrategyContext): StrategyIntent {
-    const top = topOfBook(book);
-    if (top === null) {
-      return hold(book, null, 0, 0, 0, ['order book is empty'], context.now);
+    const prepared = this.prepare(book, context);
+    if ('intent' in prepared) {
+      return prepared.intent;
     }
-
-    const usability = isBookUsable(book, this.config.maxBookAgeMs, context.now);
-    if (!usability.ok) {
-      return unusable(book, top, top.microprice, context.now, usability);
-    }
+    const { top } = prepared;
 
     const previous = this.states.get(book.tokenId);
     if (previous === undefined || !previous.initialized) {
@@ -389,7 +528,7 @@ export class MomentumTakerStrategy implements Strategy {
     };
   }
 
-  public reset(tokenId?: string): void {
+  public override reset(tokenId?: string): void {
     if (tokenId === undefined) {
       this.states.clear();
       return;
@@ -399,9 +538,14 @@ export class MomentumTakerStrategy implements Strategy {
 }
 
 export function createStrategy(kind: StrategyKind, config: StrategyConfig): Strategy {
-  return kind === 'micro-maker'
-    ? new MicroMakerStrategy(config)
-    : new MomentumTakerStrategy(config);
+  switch (kind) {
+    case 'micro-maker':
+      return new MicroMakerStrategy(config);
+    case 'maker-scalper':
+      return new MakerScalperStrategy(config);
+    case 'momentum-taker':
+      return new MomentumTakerStrategy(config);
+  }
 }
 
 export function actionToSide(action: StrategyAction): 'BUY' | 'SELL' | null {
