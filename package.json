@@ -48,20 +48,20 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
-    "@biomejs/biome": "2.6.3",
-    "@playwright/test": "1.64.1",
-    "@types/node": "26.6.5",
+    "@biomejs/biome": "2.6.6",
+    "@playwright/test": "1.65.0",
+    "@types/node": "26.6.6",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "@vitejs/plugin-react": "6.1.2",
-    "@vitest/coverage-v8": "5.0.5",
-    "concurrently": "10.0.6",
+    "@vitejs/plugin-react": "6.2.1",
+    "@vitest/coverage-v8": "5.1.0",
+    "concurrently": "10.0.7",
     "ecc-universal": "2.2.3",
     "fast-check": "4.10.2",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
-    "vite": "8.3.5",
-    "vitest": "5.0.5"
+    "vite": "8.3.6",
+    "vitest": "5.1.0"
   },
   "overrides": {
     "esbuild": "0.28.2",
